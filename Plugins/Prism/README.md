@@ -13,10 +13,7 @@ Prism 给 Codex 左栏的项目和会话配色。它沿用 Codex 的置顶顺序
 | 查看置顶顺序 | 展开「置顶」查看编号。切到按项目聚合，可以只展开某个项目，查看其中的置顶会话。 |
 | 撤销配色 | 在对应行的色板里点「恢复默认色」。也可以从「最近使用」选回以前用过的颜色。 |
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/JFireworm/packpier/main/Resources/Marketplace/Previews/prism-dark.png">
-  <img alt="左边是会话颜色，右边是项目颜色 / Conversation and project color pickers" src="https://raw.githubusercontent.com/JFireworm/packpier/main/Resources/Marketplace/Previews/prism.png">
-</picture>
+<a href="https://raw.githubusercontent.com/JFireworm/packpier/main/docs/images/prism-sidebar.png"><img src="https://raw.githubusercontent.com/JFireworm/packpier/main/docs/images/prism-sidebar.png" width="300" alt="按项目分组的置顶会话及 Orchid 项目的色板 / Pinned chats grouped by project with the Orchid project palette open"></a>
 
 ## English
 
@@ -29,4 +26,4 @@ Prism adds project and conversation colors to the Codex sidebar. It follows the 
 | Inspect pinned order | Expand Pinned to see the rank numbers. Switch to project grouping to expand just one project's pinned conversations. |
 | Reset a color | Open the row's palette and choose **Restore default color**. Choose a swatch from Recently Used to apply a previous color again. |
 
-Packpier keeps your Prism preferences on this Mac. The plugin reads the local Codex catalog to match conversations to projects.
+Packpier keeps your Prism preferences on this Mac. The plugin reads the local Codex catalog to match conversations to projects. [View the sidebar and project palette](https://raw.githubusercontent.com/JFireworm/packpier/main/docs/images/prism-sidebar.png)

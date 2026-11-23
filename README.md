@@ -10,7 +10,19 @@ Packpier 是 macOS 上的 Codex 插件管理器。插件市场展示每个插件
 | Prism | 在置顶、项目和最近会话中使用同一套颜色。可按项目聚合置顶会话，也可单独给一个会话选色。[查看 Prism 效果与操作](Plugins/Prism/README.md) |
 | 自定义背景 | 使用本地文件或内置图片，调整遮罩和磨砂，在收藏和最近使用中重新选图。入口在「设置 → 自定义背景」。 |
 
-![Prism 会话选色与项目选色示例](Resources/Marketplace/Previews/prism.png)
+### Prism
+
+侧栏中的置顶会话按项目分组。会话标题上的色条标记单条会话，项目行右侧的色块可以打开项目色板。
+
+<a href="docs/images/prism-sidebar.png"><img src="docs/images/prism-sidebar.png" width="300" alt="Codex 侧栏中按项目分组的置顶会话、彩色会话标题，以及 Orchid 项目展开的色板"></a>
+
+### 自定义背景
+
+同一段对话切换两张壁纸后的效果，点图可查看原尺寸。
+
+| 花园与白兔 | 粉色花枝 |
+| --- | --- |
+| [![花园与白兔壁纸上的 Codex 对话](docs/images/background-garden.jpg)](docs/images/background-garden.jpg) | [![切换为粉色花枝壁纸后的同一段对话](docs/images/background-blossoms.jpg)](docs/images/background-blossoms.jpg) |
 
 ### 安装
 

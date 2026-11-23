@@ -2,6 +2,14 @@
 
 为 Codex 设置透明背景、内置图片或本地图片，并在 Codex 设置的“自定义背景”页面中管理显示效果。
 
+## 壁纸效果
+
+同一段对话切换背景后的效果，点图可查看原尺寸。
+
+| 花园与白兔 | 粉色花枝 |
+| --- | --- |
+| [![花园与白兔壁纸上的 Codex 对话](https://raw.githubusercontent.com/JFireworm/packpier/main/docs/images/background-garden.jpg)](https://raw.githubusercontent.com/JFireworm/packpier/main/docs/images/background-garden.jpg) | [![切换为粉色花枝壁纸后的同一段对话](https://raw.githubusercontent.com/JFireworm/packpier/main/docs/images/background-blossoms.jpg)](https://raw.githubusercontent.com/JFireworm/packpier/main/docs/images/background-blossoms.jpg) |
+
 ## 功能
 
 - 可选择无背景、透明背景、内置图片或本地文件。历史记录和收藏中的旧链接图片仍可使用。

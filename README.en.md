@@ -10,7 +10,19 @@ Packpier is a macOS plugin manager for Codex. The marketplace shows where each p
 | Prism | Color a conversation consistently across Pinned, Projects and Recent. Group pinned chats by project or give a chat its own color. [Prism guide and examples](Plugins/Prism/README.md#english) |
 | Custom Background | Choose a local file or a built-in image, adjust the tint and blur, and pick a wallpaper again from Favorites or Recently Used. Open Settings → Custom Background. |
 
-![Example showing Prism's conversation and project color pickers](Resources/Marketplace/Previews/prism.png)
+### Prism
+
+Pinned chats are grouped by project. A color strip marks each colored chat, and the swatch on a project row opens its palette.
+
+<a href="docs/images/prism-sidebar.png"><img src="docs/images/prism-sidebar.png" width="300" alt="The Codex sidebar with pinned chats grouped by project, colored chat titles, and the Orchid project palette open"></a>
+
+### Custom Background
+
+The same conversation with two different wallpapers. Select either image to see it at full size.
+
+| Garden and rabbits | Pink blossoms |
+| --- | --- |
+| [![A Codex conversation over the garden and rabbits wallpaper](docs/images/background-garden.jpg)](docs/images/background-garden.jpg) | [![The same conversation over the pink blossoms wallpaper](docs/images/background-blossoms.jpg)](docs/images/background-blossoms.jpg) |
 
 ### Install
 
