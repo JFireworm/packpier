@@ -24,10 +24,10 @@ import AppKit
                 if let app = running.first(where: { $0.isFinishedLaunching }) {
                     absentMessage = "Codex 未运行"
                     let pid = app.processIdentifier
-                    let reachable = await Task.detached(priority: .utility) {
-                        CodexListener.ownsEndpoint(pid)
+                    let status = await Task.detached(priority: .utility) {
+                        CodexListener.inspect(pid)
                     }.value
-                    next = reachable ? "Codex 本机端口可连接" : "Codex 已运行，未检测到可用的本机连接"
+                    next = status.rawValue
                 } else if !running.isEmpty {
                     next = "正在启动 Codex"
                 } else if mayLaunch {
@@ -39,8 +39,10 @@ import AppKit
                 // Launch once on activation. Respect a subsequent deliberate quit.
                 mayLaunch = false
                 guard !Task.isCancelled else { return }
-                self?.message = next
-                report(next)
+                if self?.message != next {
+                    self?.message = next
+                    report(next)
+                }
                 do { try await Task.sleep(for: .seconds(5)) } catch { return }
             } while !Task.isCancelled
         }

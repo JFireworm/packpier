@@ -42,7 +42,7 @@ enum PackageOrderCheck {
         try await LocalPrism.wait(m,"加载器语言"){ (m.state.raw["presentation"] as? Fields)?["languagePreference"] as? String == "en" }
         m.send("refreshLog")
         try await LocalPrism.wait(m,"刷新日志"){ !(m.state.raw["logText"] as? String ?? "").isEmpty }
-        try require(m.logURL.path.hasPrefix(support.path), "日志应在隔离目录")
+        try require((m.state.raw["logPath"] as? String)?.hasPrefix(support.path) == true, "日志应在隔离目录")
         m.send("clearLog")
         try await LocalPrism.wait(m,"清空临时日志"){ (m.state.raw["logText"] as? String ?? "x").isEmpty }
         await withCheckedContinuation { continuation in m.finish { continuation.resume() } }

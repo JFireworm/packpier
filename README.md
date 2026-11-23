@@ -1,46 +1,48 @@
 # Packpier
 
-**简体中文** · [English](README.en.md)
+[简体中文](README.zh-CN.md) · **English**
 
-Packpier 是 macOS 上的 Codex 插件管理器。插件市场展示每个插件在 Codex 中的位置、使用效果和运行状态。当前支持 Codex，其他目标应用的接入仍在开发中。
+Packpier is a macOS plugin manager for Codex. The marketplace shows where each plugin appears, how it looks and whether it is running. Codex is the supported app. Support for additional apps is in development.
 
-| 内置插件 | 在 Codex 里可以做什么 |
+| Built-in plugin | What it does in Codex |
 | --- | --- |
-| P-Sign | 把指针移到左下角带小绿点的 P 上。点图片图标换背景，点滑杆打开背景设置。 |
-| Prism | 在置顶、项目和最近会话中使用同一套颜色。可按项目聚合置顶会话，也可单独给一个会话选色。[查看 Prism 效果与操作](Plugins/Prism/README.md) |
-| 自定义背景 | 使用本地文件或内置图片，调整遮罩和磨砂，在收藏和最近使用中重新选图。入口在「设置 → 自定义背景」。 |
+| P-Sign | Hover over the P with the small green dot in the bottom-left corner. Click the picture icon to change the wallpaper or the sliders to open background settings. |
+| Prism | Color a conversation consistently across Pinned, Projects and Recent. Group pinned chats by project or give a chat its own color. [Prism guide and examples](Plugins/Prism/README.md#english) |
+| Custom Background | Choose a local file or a built-in image, adjust the tint and blur, and pick a wallpaper again from Favorites or Recently Used. Open Settings → Custom Background. |
 
 ### Prism
 
-侧栏中的置顶会话按项目分组。会话标题上的色条标记单条会话，项目行右侧的色块可以打开项目色板。
+Pinned chats are grouped by project. A color strip marks each colored chat, and the swatch on a project row opens its palette.
 
-<a href="docs/images/prism-sidebar.png"><img src="docs/images/prism-sidebar.png" width="300" alt="Codex 侧栏中按项目分组的置顶会话、彩色会话标题，以及 Orchid 项目展开的色板"></a>
+<a href="docs/images/prism-sidebar.png"><img src="docs/images/prism-sidebar.png" width="300" alt="The Codex sidebar with pinned chats grouped by project, colored chat titles, and the Orchid project palette open"></a>
 
-### 自定义背景
+### Custom Background
 
-同一段对话切换两张壁纸后的效果，点图可查看原尺寸。
+The same conversation with two different wallpapers. Select either image to see it at full size.
 
-| 花园与白兔 | 粉色花枝 |
+| Garden and rabbits | Pink blossoms |
 | --- | --- |
-| [![花园与白兔壁纸上的 Codex 对话](docs/images/background-garden.jpg)](docs/images/background-garden.jpg) | [![切换为粉色花枝壁纸后的同一段对话](docs/images/background-blossoms.jpg)](docs/images/background-blossoms.jpg) |
+| [![A Codex conversation over the garden and rabbits wallpaper](docs/images/background-garden.jpg)](docs/images/background-garden.jpg) | [![The same conversation over the pink blossoms wallpaper](docs/images/background-blossoms.jpg)](docs/images/background-blossoms.jpg) |
 
-### 安装
+### Install
 
-1. 打开 [GitHub Releases](https://github.com/JFireworm/packpier/releases/latest)，选择适合这台 Mac 的安装文件。Apple Silicon 对应 arm64，最低系统版本为 macOS 14。
-2. 下载 DMG 后双击打开，将 **Packpier.app 拖到同一窗口中的 Applications（应用程序）**。复制完成后推出磁盘映像，从「应用程序」打开 Packpier。使用 v0.1.23 的 ZIP 时，解压后将 App 拖入「应用程序」。
-3. 打开插件市场。绿色表示已在 Codex 窗口中运行，空心圆表示等待，红色表示该插件报告错误。点选插件可以看到「安装详情」和错误原文。
+1. Open [GitHub Releases](https://github.com/JFireworm/packpier/releases/latest) and choose the file for your Mac. Apple Silicon uses arm64. Packpier requires macOS 14 or later.
+2. Open the DMG and **drag Packpier.app onto Applications in the same window**. Eject the disk image and open Packpier from Applications. For the v0.1.23 ZIP, extract the app and drag it to Applications.
+3. In the marketplace, green means a plugin is running in a Codex window, an empty circle means waiting and red indicates a plugin error. Select a plugin to read its installation details and error message.
 
-0.1.24 起，App 随附支持 SQLite 的 Node.js 运行时。0.1.23 使用本机的 Node.js，Prism 需要可直接导入 `node:sqlite` 的版本。若旧版提示 `No such built-in module: node:sqlite`，请使用包含运行时的安装包，或为旧版准备支持该模块的 Node.js。[Node.js SQLite 版本说明](https://nodejs.org/api/sqlite.html)
+Starting with 0.1.24, Packpier includes a Node.js runtime with SQLite support. Version 0.1.23 uses a system runtime. If Prism reports `No such built-in module: node:sqlite`, use a build with the bundled runtime or provide a compatible Node.js installation for the older release. [Node.js SQLite version history](https://nodejs.org/api/sqlite.html)
 
-「Codex 已运行，未检测到可用的本机连接」表示 Packpier 已找到 Codex 进程，窗口连接尚未建立。这个状态和 Prism 的 SQLite 错误可以同时出现。把 App 拖入「应用程序」后打开 Packpier，加载器会随主程序启动。在状态提示旁点「连接详情」；「插件加载器 · 已响应」表示主程序已收到加载器的回复，下方的「Codex 窗口」单独显示窗口连接结果。每个插件的启用开关与它是否已在窗口中运行分别显示。
+If Codex is running but Packpier cannot find a local connection, it has found the process and is still waiting for a usable window connection. A plugin dependency error can occur at the same time. After copying the app to Applications, open Packpier to start the bundled loader. In Connection Details, “Plugin loader: Responding” confirms that the app has received a reply from its helper. The Codex window row reports the window connection separately. Each plugin also shows its own enable switch and runtime status.
 
-### 插件与数据
+To diagnose a fresh installation, open **Connection Details → Show Log File in Finder**. Packpier records loader startup and Codex connection checks in `~/Library/Logs/Packpier/connection.log`. A running Codex app must expose a compatible local connection before the plugins can appear.
 
-三个内置插件受删除保护。插件市场支持导入、排序和保存本地插件 ZIP；正式版的 Codex 窗口效果由三个内置插件提供。Prism 在本机保存颜色，自定义背景的内置图片来源会联网，收藏可保存到用户的图片目录。[插件开发 Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
+### Plugins and data
 
-### 构建、测试与更新
+The three built-ins are protected from removal. The marketplace supports importing, reordering and storing local plugin ZIPs. The release loads the three bundled effects in the Codex window. Prism stores its colors locally. Custom Background fetches built-in images over the network and can save favorites in your Pictures directory. [Plugin authoring Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
 
-在 macOS 上安装 Xcode、Node.js 22.13+、npm、Python 3、uv 和 Chrome。首次构建会校验下载的 Sparkle 框架和 Node.js 运行时。可用 `CHROME_BIN` 指定测试浏览器。
+### Build, test and update
+
+Install Xcode, Node.js 22.13+, npm, Python 3, uv and Chrome on macOS. The first build verifies the downloaded Sparkle framework and Node.js runtime. Set `CHROME_BIN` to select another Chrome executable for tests.
 
 ```sh
 make bootstrap
@@ -49,6 +51,6 @@ open build/Packpier.app
 ./Scripts/build-dmg.sh
 ```
 
-`make lint` 检查代码与分发资源，`make unit` 和 `make integration` 运行单元与集成测试。内置插件源码位于 [Prism](Plugins/Prism)、[自定义背景](Plugins/CustomBackground) 和 [P-Sign](Resources/BundledPlugins/p-sign)。修改插件后执行 `python3 Scripts/plugin-archives.py` 同步市场归档。
+`make lint` checks source and distribution files. `make unit` and `make integration` run the test suites. Plugin sources are in [Prism](Plugins/Prism), [Custom Background](Plugins/CustomBackground) and [P-Sign](Resources/BundledPlugins/p-sign). Regenerate their marketplace archives with `python3 Scripts/plugin-archives.py` after editing a plugin.
 
-在「设置与更新」点「检查更新」即可获取新版。维护者在构建后运行 `python3 Scripts/release.py`，将安装 DMG、Sparkle 更新用的 ZIP 和签名的 `appcast.xml` 一起上传到对应版本的 Release。Sparkle 使用钥匙串里的发布密钥，`PACKPIER_SIGNING_ACCOUNT` 可指定密钥条目。Apple Developer ID 签名和公证需另行完成。[MIT 许可证](LICENSE) · [第三方声明](THIRD_PARTY_NOTICES.md)
+Select **Check for Updates** in Settings & Updates. Maintainers run `python3 Scripts/release.py` after building and attach the installer DMG, Sparkle update ZIP and signed `appcast.xml` to the corresponding GitHub Release. Set `PACKPIER_SIGNING_ACCOUNT` to select a release key in the macOS Keychain. Apple Developer ID signing and notarization are separate release steps. [MIT license](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md)

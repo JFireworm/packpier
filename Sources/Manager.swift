@@ -15,6 +15,17 @@ import UniformTypeIdentifiers
     @Published var authorization: Authorization?
     @Published var page = "插件市场"
     @Published var selectedPackageID: String?
+    private let connectionLog: ConnectionLog
+    private var lastHostReport = ""
+
+    init(connectionLog: ConnectionLog = ConnectionLog()) {
+        self.connectionLog = connectionLog
+    }
+
+    private func record(_ message: String) {
+        do { try connectionLog.append(message) }
+        catch { NSLog("Packpier connection log: %@", error.localizedDescription) }
+    }
     #if PACKPIER_INDEPENDENT
     private let codexStartup = CodexStartup()
     private func observeCodexStartup() {
@@ -23,16 +34,15 @@ import UniformTypeIdentifiers
             codexStartup.stop()
             return
         }
-        func showIfWaiting(_ message: String) {
-            if ["checkingHost", "waitingForCDP", "waitingForHost"].contains(state.status) {
-                connection = message
-            }
-        }
-        showIfWaiting(codexStartup.message)
+        if waitingForCodex { connection = codexStartup.message }
         codexStartup.start { [weak self] message in
-            guard let self, ["checkingHost", "waitingForCDP", "waitingForHost"].contains(self.state.status) else { return }
-            self.connection = message
+            guard let self else { return }
+            self.record("Codex: " + message)
+            if self.waitingForCodex { self.connection = message }
         }
+    }
+    private var waitingForCodex: Bool {
+        state.status == "checkingHost" || state.status == "waitingForCDP"
     }
     #endif
     let target: PackageTarget = WeChatOverlayTarget.testMode ? .wechat : .codex
@@ -79,6 +89,8 @@ import UniformTypeIdentifiers
     }
     func begin() {
         guard observers.isEmpty else { return }
+        let info = Bundle.main.infoDictionary
+        record("Packpier \(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?")) · macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
             observers.append(center.addObserver(forName:name, object:nil, queue:.main) { [weak self] event in
@@ -165,6 +177,7 @@ import UniformTypeIdentifiers
             #endif
         } catch {
             self.error = error.localizedDescription
+            record("Loader startup failed: " + error.localizedDescription)
             connection = "加载器未连接"
             if loader?.process.isRunning == true { loader?.close() } else { loader = nil }
         }
@@ -179,12 +192,15 @@ import UniformTypeIdentifiers
             self?.receive(msg)
         }, ended: { [weak self] in self?.didStop(ticket) })
         try hostClient.start(executable:executable, arguments:arguments, environment:environment)
+        lastHostReport = ""
+        record("Loader started · pid=\(hostClient.process.processIdentifier)")
         loader = hostClient
         initializing = try hostClient.request("initialize",params)
         connection = "正在连接加载器"
     }
     private func didStop(_ ticket: UUID) {
         guard generation == ticket else { return }
+        record("Loader stopped · status=\(loader?.process.terminationStatus ?? -1)")
         #if PACKPIER_INDEPENDENT
         codexStartup.stop()
         #endif
@@ -226,7 +242,10 @@ import UniformTypeIdentifiers
                 error = failure["message"] as? String ?? "操作失败"
                 if operation == "installLocalPackage" { importInFlight = nil }
                 if operation == "exportPackage" { exportingID = nil; exportStarted = false }
-                if id == initializing { loader?.close() }
+                if id == initializing {
+                    record("Loader initialization failed: " + (error ?? "unknown"))
+                    loader?.close()
+                }
                 return
             }
             #if PACKPIER_INDEPENDENT
@@ -261,6 +280,12 @@ import UniformTypeIdentifiers
     }
     private func update(_ raw: Fields) {
         state = HostState(raw:raw)
+        let detail = (raw["status"] as? Fields)?["message"] as? String ?? ""
+        let hostReport = "Loader responded · window=\(state.status) \(detail)"
+        if hostReport != lastHostReport {
+            record(hostReport)
+            lastHostReport = hostReport
+        }
         prepareBuiltInBuilds()
         if let id = exportingID {
             if (raw["exportingPackageIDs"] as? [String] ?? []).contains(id) {
@@ -335,18 +360,17 @@ import UniformTypeIdentifiers
         }
     }
 
-    var logURL: URL {
-        if let path = state.raw["logPath"] as? String, path.hasPrefix("/") { return URL(fileURLWithPath:path) }
-        return FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0]
-            .appendingPathComponent("Codex Tweaks/Logs/codex-tweaks.log")
+    func logFileForReveal() throws -> URL {
+        try connectionLog.append("Snapshot · loaderResponded=\(state.ready) window=\(state.status) · \(connection)")
+        return connectionLog.url
     }
 
     func revealLog() {
-        let url = logURL
-        if FileManager.default.fileExists(atPath:url.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-        } else if !NSWorkspace.shared.open(url.deletingLastPathComponent()) {
-            error = "日志目录尚不可用。"
+        do {
+            let file = try logFileForReveal()
+            NSWorkspace.shared.activateFileViewerSelecting([file])
+        } catch {
+            self.error = "\(connectionLog.url.path)\n\(error.localizedDescription)"
         }
     }
     func chooseFile() {

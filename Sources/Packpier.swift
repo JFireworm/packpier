@@ -156,6 +156,7 @@ struct Dashboard: View {
                 if let detail = (m.state.raw["status"] as? Fields)?["message"] as? String, !detail.isEmpty {
                     Text(verbatim:detail).font(.callout).textSelection(.enabled)
                 }
+                Button("打开日志文件位置", systemImage: "folder", action: m.revealLog)
             }.padding(20)
         }
         .sheet(item:$m.preview) { item in importSheet(item) }
@@ -203,8 +204,10 @@ struct Dashboard: View {
 
     @ViewBuilder var marketplace: some View {
         let targets = HStack(spacing:10) {
-            LabeledContent("目标应用") { Text(verbatim:PPText.get(m.target.displayName)) }
-                .fixedSize().accessibilityIdentifier("market.selection")
+            Picker("目标应用", selection: .constant(m.target)) {
+                Text(verbatim: PPText.get(m.target.displayName)).tag(m.target)
+            }
+            .pickerStyle(.menu).fixedSize().accessibilityIdentifier("market.selection")
             Button("添加应用（开发中）", systemImage:"plus") {}
                 .disabled(true).accessibilityIdentifier("market.add")
         }.fixedSize()
