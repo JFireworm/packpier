@@ -30,17 +30,19 @@ Packpier 是 macOS 上的 Codex 插件管理器。插件市场展示每个插件
 2. 下载 DMG 后双击打开，将 **Packpier.app 拖到同一窗口中的 Applications（应用程序）**。复制完成后推出磁盘映像，从「应用程序」打开 Packpier。使用 v0.1.23 的 ZIP 时，解压后将 App 拖入「应用程序」。
 3. 打开插件市场。绿色表示已在 Codex 窗口中运行，空心圆表示等待，红色表示该插件报告错误。点选插件可以看到「安装详情」和错误原文。
 
+当前版本未经 Apple 公证。如果 macOS 阻止首次打开，请确认文件来自本项目的 [GitHub Releases](https://github.com/JFireworm/packpier/releases)，再前往“系统设置 → 隐私与安全性”允许打开。
+
 全新安装后，从「应用程序」首次打开 Packpier，它会向 macOS 注册登录项。如果显示「等待 macOS 允许登录启动」，可在「设置与更新」点「打开登录项设置」完成批准。「自动更新」默认开启，也可以在同一页调整。
 
 0.1.24 起，App 随附支持 SQLite 的 Node.js 运行时。0.1.23 使用本机的 Node.js，Prism 需要可直接导入 `node:sqlite` 的版本。若旧版提示 `No such built-in module: node:sqlite`，请使用包含运行时的安装包，或为旧版准备支持该模块的 Node.js。[Node.js SQLite 版本说明](https://nodejs.org/api/sqlite.html)
 
-「Codex 已运行，未检测到可用的本机连接」表示 Packpier 已找到 Codex 进程，窗口连接尚未建立。这个状态和 Prism 的 SQLite 错误可以同时出现。把 App 拖入「应用程序」后打开 Packpier，加载器会随主程序启动。在状态提示旁点「连接详情」；「插件加载器 · 已响应」表示主程序已收到加载器的回复，下方的「Codex 窗口」单独显示窗口连接结果。每个插件的启用开关与它是否已在窗口中运行分别显示。
+若插件市场显示「Codex 已运行，未检测到可用的本机连接」，先保存 Codex 中的工作，再点小字旁的**「重启并连接」**，在同一行确认。Packpier 会请求 Codex 正常退出，重新打开应用，然后等待窗口连接。若重启后 Codex 仍未提供兼容的本机连接，可在「连接详情」分别查看加载器和窗口的状态。
 
 首次安装后若插件一直等待，可在「连接详情」中点「打开日志文件位置」。Packpier 会在 `~/Library/Logs/Packpier/connection.log` 记录加载器启动和 Codex 本机连接的检测结果。Codex 提供可用的本机连接后，插件才能在窗口中显示。
 
 ### 插件与数据
 
-三个内置插件受删除保护。插件市场支持导入、排序和保存本地插件 ZIP；正式版的 Codex 窗口效果由三个内置插件提供。Prism 在本机保存颜色，自定义背景的内置图片来源会联网，收藏可保存到用户的图片目录。[插件开发 Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
+三个内置插件均可单独关闭，并受删除保护。关闭 P-Sign 会隐藏左下角的 P 和悬停菜单；Prism 和自定义背景各自保存设置。插件市场支持导入、排序和保存本地插件 ZIP，正式版的 Codex 窗口效果由三个内置插件提供。Prism 在本机保存颜色，自定义背景的内置图片来源会联网，收藏可保存到用户的图片目录。[插件开发 Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
 
 ### 构建、测试与更新
 

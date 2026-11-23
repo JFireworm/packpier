@@ -122,6 +122,7 @@ struct MarketplacePage: View {
     let showConnection: () -> Void
     @AppStorage(PPText.languageKey) private var language = "system"
     @State private var removalCandidate: TweakPackage?
+    @State private var confirmingRestart = false
     private var code:String { PPText.resolved(language) }
     private var market:Marketplace? { try? Marketplace.bundled.get() }
     private var installed:[TweakPackage] { target == .codex ? m.state.packages : [] }
@@ -137,9 +138,17 @@ struct MarketplacePage: View {
         let selected = rows.first { $0.id == m.selectedPackageID } ?? rows.first
         VStack(alignment:.leading,spacing:12) {
             if target == .codex && !m.state.connected {
-                HStack {
-                    Text(LocalizedStringKey(m.connection)).font(.callout).foregroundStyle(.secondary)
-                    Button("连接详情", action:showConnection)
+                HStack(spacing:8) {
+                    Text(LocalizedStringKey(confirmingRestart ? "Codex 将退出并重新打开。请先保存窗口中未提交的内容。" : (m.restartMessage ?? m.connection)))
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal:false, vertical:true)
+                    if confirmingRestart && m.canRestartCodex {
+                        Button("确认重启") { confirmingRestart = false; m.restartCodex() }.buttonStyle(.link)
+                        Button("取消") { confirmingRestart = false }.buttonStyle(.link)
+                    } else if m.canRestartCodex {
+                        Button("重启并连接") { confirmingRestart = true }
+                            .buttonStyle(.link).accessibilityIdentifier("market.restartCodex")
+                    }
+                    if !confirmingRestart { Button("连接详情", action:showConnection).buttonStyle(.link) }
                     if !m.state.ready {
                         Button(LocalizedStringKey(m.externalLoaderRunning ? "切换到 Packpier" : "重新连接")) {
                             m.reconnectFromMarketplace()
@@ -149,7 +158,7 @@ struct MarketplacePage: View {
                         .accessibilityIdentifier("market.reconnect")
 
                     }
-                }
+                }.font(.callout)
             }
             if case let .failure(error) = Marketplace.bundled { Text(PPText.get(error.localizedDescription)).foregroundStyle(.secondary) }
             HStack(alignment:.top,spacing:14) {
@@ -162,7 +171,9 @@ struct MarketplacePage: View {
                 else { ContentUnavailableView(LocalizedStringKey(m.search.isEmpty ? "此应用暂无插件包" : "没有匹配的插件包"),systemImage:"shippingbox").frame(maxWidth:.infinity,minHeight:180) }
             }
             if !m.notice.isEmpty { Text(PPText.get(m.notice)).font(.callout).foregroundStyle(.secondary) }
-        }.alert("移除插件？", isPresented: Binding(
+        }.onChange(of:m.canRestartCodex) { _, available in
+            if !available { confirmingRestart = false }
+        }.onDisappear { confirmingRestart = false }.alert("移除插件？", isPresented: Binding(
             get: { removalCandidate != nil },
             set: { if !$0 { removalCandidate = nil } }
         ), presenting: removalCandidate) { package in
@@ -217,7 +228,7 @@ struct MarketplacePage: View {
                     .fixedSize()
                     .accessibilityLabel(Text("启用 \(item.title(code))"))
                     .accessibilityIdentifier("market.enable." + p.id)
-                    .disabled(p.id == BuiltInPackages.sign || m.state.building(p.id) || p.actions["setEnabled"] as? Bool == false)
+                    .disabled(m.state.building(p.id) || p.actions["setEnabled"] as? Bool == false)
                 }
                 if target == .codex && BuiltInPackages.ids.contains(item.id) { Label("内置",systemImage:"lock").font(.caption).foregroundStyle(.secondary) }
                 MarketStatus(health:health(item),compact:false)

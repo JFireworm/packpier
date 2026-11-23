@@ -50,6 +50,18 @@ export function createWindowEffects({ prismService, backgroundService, settingsS
     apply({ enabled, packages, disabledPackageIDs = [] }) {
       const disabled = new Set(disabledPackageIDs);
       const wanted = enabled ? packages.filter(({ id }) => effects.has(id) && !disabled.has(id)) : [];
+      // P-Sign provides shortcuts and can join or leave an existing set of effects.
+      // Preserve the other effects and open settings panes when only its switch changes.
+      const signIndex = mounted.findIndex(item => item.id === "p-sign");
+      const nextSign = wanted.findIndex(item => item.id === "p-sign");
+      if (signIndex >= 0 && nextSign < 0) dispose(mounted.splice(signIndex, 1)[0].cleanups);
+      if (signIndex < 0 && nextSign >= 0 && mounted.length > 0 && mounted.length + 1 === wanted.length &&
+          wanted.filter(item => item.id !== "p-sign").every((item, index) => item.id === mounted[index].id)) {
+        const errors = {};
+        try { mounted.splice(nextSign, 0, { id: "p-sign", cleanups: mount("p-sign") }); }
+        catch (error) { errors["p-sign"] = String(error.message ?? error); }
+        return { mounted: mounted.map(item => item.id), errors };
+      }
       let keep = 0;
       while (keep < wanted.length && keep < mounted.length && wanted[keep].id === mounted[keep].id)
         keep++;

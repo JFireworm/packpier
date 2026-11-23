@@ -17,7 +17,7 @@ async function listenerOwner() {
 }
 import readline from "node:readline";
 
-const VERSION = "packpier-window-4";
+const VERSION = "packpier-window-5";
 const args = process.argv.slice(2);
 const option = name => {
   const index = args.indexOf("--" + name);

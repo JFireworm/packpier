@@ -1,11 +1,11 @@
 {
   "title": "Packpier",
   "format": "UDZO",
-  "background": "builtin-arrow",
-  "icon-size": 88,
-  "window": { "position": { "x": 180, "y": 160 }, "size": { "width": 640, "height": 240 } },
+  "background": "build/installer-paper.tiff",
+  "icon-size": 80,
+  "window": { "position": { "x": 180, "y": 160 }, "size": { "width": 640, "height": 300 } },
   "contents": [
-    { "x": 155, "y": 118, "type": "file", "path": "build/Packpier.app" },
-    { "x": 485, "y": 118, "type": "link", "path": "/Applications", "name": "Applications" }
+    { "x": 176, "y": 173, "type": "file", "path": "build/Packpier.app" },
+    { "x": 464, "y": 173, "type": "link", "path": "/Applications", "name": "Applications" }
   ]
 }

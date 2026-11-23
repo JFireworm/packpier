@@ -52,14 +52,41 @@ import AppKit
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             return "未找到 Codex 应用"
         }
+        return await open(url) ? "正在启动 Codex" : "未能启动 Codex"
+    }
+
+    private static func open(_ url: URL) async -> Bool {
         let config = NSWorkspace.OpenConfiguration()
         config.activates = false
         config.createsNewApplicationInstance = false
-        let launched = await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { continuation in
             NSWorkspace.shared.openApplication(at: url, configuration: config) { app, error in
                 continuation.resume(returning: app != nil && error == nil)
             }
         }
-        return launched ? "正在启动 Codex" : "未能启动 Codex"
+    }
+
+    static func restart(report: (String) -> Void) async throws {
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).filter { !$0.isTerminated }
+        guard apps.count == 1, let app = apps.first, let url = app.bundleURL else {
+            throw PackpierError.message("Codex 运行状态已变化，请查看连接详情。")
+        }
+        let pid = app.processIdentifier
+        let status = await Task.detached(priority: .utility) { CodexListener.inspect(pid) }.value
+        try Task.checkCancellation()
+        guard status == .missing, !app.isTerminated else {
+            throw PackpierError.message("Codex 运行状态已变化，请查看连接详情。")
+        }
+        report("正在等待 Codex 退出…")
+        guard app.terminate() else { throw PackpierError.message("Codex 尚未退出，请先处理保存提示。") }
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(20))
+        while !app.isTerminated {
+            guard clock.now < deadline else { throw PackpierError.message("Codex 尚未退出，请先处理保存提示。") }
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        try Task.checkCancellation()
+        report("正在启动 Codex")
+        guard await open(url) else { throw PackpierError.message("未能启动 Codex") }
     }
 }

@@ -5,6 +5,13 @@ import UniformTypeIdentifiers
 @MainActor final class Manager: ObservableObject {
     @Published var state = HostState()
     @Published var connection = "正在连接加载器"
+    @Published private(set) var restartMessage: String?
+    @Published private var restartTask: Task<Void, Never>?
+    var isRestartingCodex: Bool { restartTask != nil }
+    var canRestartCodex: Bool {
+        target == .codex && state.ready && state.enabled && !state.connected && !externalLoaderRunning &&
+            !isRestartingCodex && connection == CodexListener.Status.missing.rawValue
+    }
     @Published private(set) var externalLoaderRunning = false
     @Published private var releaseWatchdog: Task<Void, Never>?
     var switchingLoader: Bool { releaseWatchdog != nil }
@@ -134,6 +141,33 @@ import UniformTypeIdentifiers
         }
         reconcile()
     }
+    func restartCodex() {
+        guard canRestartCodex, !terminating else { return }
+        let ticket = generation
+        restartTask = Task {
+            defer { if generation == ticket { restartTask = nil } }
+            do {
+                try await CodexStartup.restart { message in
+                    restartMessage = message
+                    record("Codex: " + message)
+                }
+                try Task.checkCancellation()
+                restartMessage = "正在连接 Codex"
+                let clock = ContinuousClock()
+                let deadline = clock.now.advanced(by: .seconds(25))
+                while state.enabled && !state.connected && clock.now < deadline {
+                    try await Task.sleep(for: .milliseconds(250))
+                }
+                restartMessage = state.enabled && !state.connected ? "Codex 已重新打开，窗口仍未连接。" : nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                restartMessage = error.localizedDescription
+            }
+            if let restartMessage { record("Codex: " + restartMessage) }
+        }
+    }
     private func reconcileAfterDelay() {
         Task {
             try? await Task.sleep(nanoseconds:700_000_000)
@@ -168,7 +202,6 @@ import UniformTypeIdentifiers
             let cache = try fm.url(for:.cachesDirectory,in:.userDomainMask,appropriateFor:nil,create:false)
             try BuiltInPackages.prepare(resources:host.resources, support:support)
             builtInBuilds.removeAll()
-            signEnableRequested = false
             managesBuiltIns = true
             var environment = ProcessInfo.processInfo.environment
             // Reuse the installed compiler when npm has it; normal npm fallback works on a fresh machine.
@@ -200,6 +233,9 @@ import UniformTypeIdentifiers
     }
     private func didStop(_ ticket: UUID) {
         guard generation == ticket else { return }
+        restartTask?.cancel()
+        restartTask = nil
+        restartMessage = nil
         record("Loader stopped · status=\(loader?.process.terminationStatus ?? -1)")
         #if PACKPIER_INDEPENDENT
         codexStartup.stop()
@@ -221,6 +257,7 @@ import UniformTypeIdentifiers
     }
     func finish(_ callback: @escaping () -> Void) {
         terminating = true
+        restartTask?.cancel()
         #if PACKPIER_INDEPENDENT
         codexStartup.stop()
         #endif
@@ -263,15 +300,10 @@ import UniformTypeIdentifiers
         } else if msg["event"] as? String == "state", let raw = msg["data"] as? Fields { update(raw) }
     }
     private var managesBuiltIns = false
-    private var signEnableRequested = false
     private var builtInBuilds = Set<String>()
     private func prepareBuiltInBuilds() {
         guard managesBuiltIns, state.ready, state.enabled else { return }
         for p in state.packages where BuiltInPackages.ids.contains(p.id) {
-            if p.id == BuiltInPackages.sign && !state.hasEnabled(p.id) && !signEnableRequested {
-                signEnableRequested = true
-                send("setPackageEnabled", ["packageID":p.id, "enabled":true])
-            }
             guard state.hasEnabled(p.id), !p.builtCurrent, !state.building(p.id), p.canBuild,
                   p.id == BuiltInPackages.sign || !p.hasBuild,
                   builtInBuilds.insert(p.id + "@" + p.version).inserted else { continue }
@@ -280,6 +312,7 @@ import UniformTypeIdentifiers
     }
     private func update(_ raw: Fields) {
         state = HostState(raw:raw)
+        if state.connected || !state.enabled { restartMessage = nil }
         let detail = (raw["status"] as? Fields)?["message"] as? String ?? ""
         let hostReport = "Loader responded · window=\(state.status) \(detail)"
         if hostReport != lastHostReport {

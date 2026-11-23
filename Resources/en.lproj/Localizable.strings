@@ -280,3 +280,9 @@
 "Codex 的监听地址与本机连接要求不符" = "Codex is listening on an unexpected address";
 "无法验证正在运行的 Codex 应用身份" = "Could not verify the identity of the running Codex app";
 "未能读取 Codex 的本机连接状态" = "Could not read the local Codex connection status";
+"重启并连接" = "Restart and connect";
+"确认重启" = "Confirm restart";
+"正在等待 Codex 退出…" = "Waiting for Codex to quit…";
+"Codex 尚未退出，请先处理保存提示。" = "Codex is still open. Check for a save prompt before retrying.";
+"Codex 已重新打开，窗口仍未连接。" = "Codex reopened. Its window is still disconnected.";
+"Codex 运行状态已变化，请查看连接详情。" = "The state of Codex changed. Check Connection Details.";

@@ -4,7 +4,7 @@ import { createWindowEffects } from "./index.js";
 
 import { backgroundTitle, registerBackgroundNavigation } from "./background-settings-nav.js";
 
-const VERSION = "packpier-window-4";
+const VERSION = "packpier-window-5";
 
 const pending = new Map();
 const listeners = new Map();

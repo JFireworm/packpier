@@ -26,6 +26,14 @@ import AppKit
             throw PackpierError.message("The latest connection state did not reach the revealed log")
         }
         let pid: pid_t = 123
+        manager.connection = CodexListener.Status.missing.rawValue
+        manager.state = HostState(raw: ["enabled":true, "packages":[], "status":["kind":"waitingForCDP"]])
+        guard manager.canRestartCodex else { throw PackpierError.message("Missing inline restart action") }
+        manager.connection = CodexListener.Status.identityFailed.rawValue
+        guard !manager.canRestartCodex else { throw PackpierError.message("Offered to restart an unverified application") }
+        manager.connection = CodexListener.Status.missing.rawValue
+        manager.state = HostState(raw: ["enabled":true, "packages":[], "status":["kind":"connected"]])
+        guard !manager.canRestartCodex else { throw PackpierError.message("Connected window offered restart") }
         guard CodexListener.classify("", exitCode: 1, pid: pid) == .missing,
               CodexListener.classify("", exitCode: 2, pid: pid) == .checkFailed,
               CodexListener.classify("p456\nn127.0.0.1:9335", exitCode: 0, pid: pid) == .checkFailed,

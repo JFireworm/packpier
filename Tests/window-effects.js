@@ -68,6 +68,13 @@ async function run() {
   check(wallpaper.style.getPropertyValue("--ct-cbgp-bg-image").includes(pixel), "Favorite did not become wallpaper");
   effects.apply(state);
   check(sign === document.querySelector(".packpier-p-sign"), "Unexpected remount");
+  const withoutSign = effects.apply({ ...state, packages: state.packages.filter(p => p.id !== "p-sign") });
+  check(withoutSign.mounted.join() === "prism,custom-background" && !sign.isConnected, "P-Sign did not stop independently");
+  check(row.style.getPropertyValue("--prism-native-color") === "#FF79A9" &&
+    !wallpaper.hidden && wallpaper.isConnected, "Stopping P-Sign affected Prism or the wallpaper");
+  check(JSON.parse(localStorage.getItem(storageKey)).favorites[0].file === favorite.file, "Stopping P-Sign lost a favorite");
+  check(effects.apply(state).mounted.join() === "p-sign,prism,custom-background" &&
+    wallpaper.isConnected && document.querySelector(".packpier-p-sign"), "Enabling P-Sign remounted other effects");
   effects.apply({ ...state, enabled: false });
   check(!document.querySelector(".packpier-p-sign,[data-packpier-cbgp-wallpaper],[data-prism-accent]"), "Effects leaked");
   check(JSON.parse(localStorage.getItem(storageKey)).favorites[0].file === favorite.file, "Favorite lost");

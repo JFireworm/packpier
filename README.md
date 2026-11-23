@@ -30,17 +30,19 @@ The same conversation with two different wallpapers. Select either image to see 
 2. Open the DMG and **drag Packpier.app onto Applications in the same window**. Eject the disk image and open Packpier from Applications. For the v0.1.23 ZIP, extract the app and drag it to Applications.
 3. In the marketplace, green means a plugin is running in a Codex window, an empty circle means waiting and red indicates a plugin error. Select a plugin to read its installation details and error message.
 
+The current version has not been notarized by Apple. If macOS blocks the first launch, verify that you downloaded Packpier from this project's [GitHub Releases](https://github.com/JFireworm/packpier/releases), then go to **System Settings → Privacy & Security** and choose **Open Anyway**.
+
 On a fresh install, open Packpier from Applications once to register it as a login item. If macOS asks for approval, open Login Items from Packpier’s Settings & Updates. Automatic updates are enabled by default and can be changed on the same screen.
 
 Starting with 0.1.24, Packpier includes a Node.js runtime with SQLite support. Version 0.1.23 uses a system runtime. If Prism reports `No such built-in module: node:sqlite`, use a build with the bundled runtime or provide a compatible Node.js installation for the older release. [Node.js SQLite version history](https://nodejs.org/api/sqlite.html)
 
-If Codex is running but Packpier cannot find a local connection, it has found the process and is still waiting for a usable window connection. A plugin dependency error can occur at the same time. After copying the app to Applications, open Packpier to start the bundled loader. In Connection Details, “Plugin loader: Responding” confirms that the app has received a reply from its helper. The Codex window row reports the window connection separately. Each plugin also shows its own enable switch and runtime status.
+If the marketplace reports that Codex is running without a local connection, save your work in Codex. Click **Restart and connect** next to that message and confirm on the same line. Packpier asks Codex to quit normally, reopens the app and waits for its window to connect. If Codex still does not provide a compatible connection, open **Connection details** to see the window status and the loader status separately.
 
 To diagnose a fresh installation, open **Connection Details → Show Log File in Finder**. Packpier records loader startup and Codex connection checks in `~/Library/Logs/Packpier/connection.log`. A running Codex app must expose a compatible local connection before the plugins can appear.
 
 ### Plugins and data
 
-The three built-ins are protected from removal. The marketplace supports importing, reordering and storing local plugin ZIPs. The release loads the three bundled effects in the Codex window. Prism stores its colors locally. Custom Background fetches built-in images over the network and can save favorites in your Pictures directory. [Plugin authoring Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
+All three built-ins can be switched off individually and are protected from removal. Turn off P-Sign to hide the corner P and its shortcuts. Prism and Custom Background keep their own settings. The marketplace supports importing, reordering and storing local plugin ZIPs. The release loads the three bundled effects in the Codex window. Prism stores its colors locally. Custom Background fetches built-in images over the network and can save favorites in your Pictures directory. [Plugin authoring Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
 
 ### Build, test and update
 
