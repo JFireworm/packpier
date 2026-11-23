@@ -36,12 +36,14 @@ final class WindowHost {
         self.onChange = onChange
         lock.unlock()
 
-        guard let node = Self.locateNode() else {
-            set(.init(kind: "nodeMissing", message: "未找到 Node.js"))
-            return false
-        }
         guard let resources = Self.locateResources() else {
             set(.init(kind: "waitingForHost", message: "缺少窗口宿主资源"))
+            return false
+        }
+        let node = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+            .deletingLastPathComponent().appendingPathComponent("node")
+        guard FileManager.default.isExecutableFile(atPath: node.path) else {
+            set(.init(kind: "nodeMissing", message: "内置运行环境缺失，请重新安装 Packpier。"))
             return false
         }
 
@@ -50,6 +52,7 @@ final class WindowHost {
         child.executableURL = node
         child.arguments = [resources.script.path, "--bundle", resources.bundle.path]
         var environment = ProcessInfo.processInfo.environment
+        environment.removeValue(forKey: "NODE_OPTIONS")
         var path = environment["PATH"] ?? "/usr/local/bin:/usr/bin:/bin"
         path = node.deletingLastPathComponent().path + ":" + path
         environment["PATH"] = path
@@ -166,27 +169,5 @@ final class WindowHost {
         guard FileManager.default.fileExists(atPath: script.path),
               FileManager.default.fileExists(atPath: bundle.path) else { return nil }
         return Resources(script: script, bundle: bundle)
-    }
-
-    private static func locateNode() -> URL? {
-        let fm = FileManager.default
-        let environment = ProcessInfo.processInfo.environment
-        if let override = environment["PACKPIER_NODE"], fm.isExecutableFile(atPath: override) {
-            return URL(fileURLWithPath: override)
-        }
-        var candidates = ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"]
-        let home = fm.homeDirectoryForCurrentUser
-        let nvm = home.appendingPathComponent(".nvm/versions/node")
-        if let versions = try? fm.contentsOfDirectory(atPath: nvm.path) {
-            for version in versions.sorted(by: { $0.compare($1, options: .numeric) == .orderedDescending }) {
-                candidates.append(nvm.appendingPathComponent(version).appendingPathComponent("bin/node").path)
-            }
-        }
-        candidates += [
-            home.appendingPathComponent(".volta/bin/node").path,
-            home.appendingPathComponent(".local/bin/node").path,
-            home.appendingPathComponent(".asdf/shims/node").path,
-        ]
-        return candidates.first { fm.isExecutableFile(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 }

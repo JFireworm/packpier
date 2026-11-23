@@ -1,0 +1,11 @@
+{
+  "title": "Packpier",
+  "format": "UDZO",
+  "background": "builtin-arrow",
+  "icon-size": 88,
+  "window": { "position": { "x": 180, "y": 160 }, "size": { "width": 640, "height": 240 } },
+  "contents": [
+    { "x": 155, "y": 118, "type": "file", "path": "build/Packpier.app" },
+    { "x": 485, "y": 118, "type": "link", "path": "/Applications", "name": "Applications" }
+  ]
+}

@@ -119,6 +119,7 @@ struct MarketplacePage: View {
     @ObservedObject var m: Manager
     @ObservedObject var drag: PackageDrag
     let target: PackageTarget
+    let showConnection: () -> Void
     @AppStorage(PPText.languageKey) private var language = "system"
     @State private var removalCandidate: TweakPackage?
     private var code:String { PPText.resolved(language) }
@@ -138,6 +139,7 @@ struct MarketplacePage: View {
             if target == .codex && !m.state.connected {
                 HStack {
                     Text(LocalizedStringKey(m.connection)).font(.callout).foregroundStyle(.secondary)
+                    Button("连接详情", action:showConnection)
                     if !m.state.ready {
                         Button(LocalizedStringKey(m.externalLoaderRunning ? "切换到 Packpier" : "重新连接")) {
                             m.reconnectFromMarketplace()

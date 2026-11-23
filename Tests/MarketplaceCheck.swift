@@ -44,7 +44,7 @@ enum MarketplaceCheck {
         let market = try Marketplace(directory:resources.appendingPathComponent("Marketplace"))
         guard market.packages(for:nil).count == market.entries.count,
               Set(market.packages(for:.codex).map(\.id)) == BuiltInPackages.ids,
-              market.packages(for:.wechat).map(\.id) == ["wechat-celadon"], market.packages(for:.feishu).isEmpty,
+              market.packages(for:.wechat).isEmpty, market.packages(for:.feishu).isEmpty,
               let entry = market.entries.first(where:{ $0.id == "custom-background" }) else {
             throw PackpierError.message("Incorrect marketplace filters")
         }

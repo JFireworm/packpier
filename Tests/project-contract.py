@@ -10,6 +10,8 @@ root = Path(__file__).resolve().parents[1]
 repo = "https://github.com/JFireworm/packpier"
 catalog = json.loads((root / "Resources/Marketplace/catalog.json").read_text())
 assert len({entry["id"] for entry in catalog}) == len(catalog)
+assert {e["id"] for e in catalog} == {"prism", "p-sign", "custom-background"}
+assert all(e["app"] == "codex" for e in catalog)
 for entry in catalog:
     link = entry["source"]
     assert link.startswith(repo + "/tree/main/"), link

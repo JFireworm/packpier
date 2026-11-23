@@ -18,6 +18,8 @@ unit: build
 	node --test Plugins/CustomBackground/src/*.test.js Tests/window-policy.mjs
 	swift test --package-path Plugins/WeChatCeladon
 integration: build
+	$(PYTHON) Tests/packaged-loader.py
+	env PATH=/usr/bin:/bin "$(CURDIR)/build/Packpier.app/Contents/Helpers/node" Tests/prism-runtime.mjs
 	$(PYTHON) Tests/plugin-library.py
 	$(PYTHON) Tests/window-effects.py
 check: lint unit integration

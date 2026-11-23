@@ -19,7 +19,7 @@ import UniformTypeIdentifiers
     private let codexStartup = CodexStartup()
     private func observeCodexStartup() {
         guard !terminating, state.ready, state.enabled,
-              marketApps.apps.contains(where: { $0.target == .codex }) else {
+              target == .codex else {
             codexStartup.stop()
             return
         }
@@ -35,45 +35,7 @@ import UniformTypeIdentifiers
         }
     }
     #endif
-    private let defaults: UserDefaults
-    @Published private(set) var marketApps: MarketApplications {
-        didSet {
-            guard marketApps != oldValue else { return }
-            marketApps.save(to: defaults)
-            #if PACKPIER_INDEPENDENT
-            observeCodexStartup()
-            #endif
-        }
-    }
-    @Published var addingMarketApp = false
-    var target: PackageTarget? { marketApps.selected?.target }
-
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        marketApps = MarketApplications.load(from:defaults)
-    }
-    func addMarketApp(_ app: MarketApp) {
-        marketApps.add(app)
-        search = ""
-        selectedPackageID = nil
-    }
-    func selectMarketApp(_ id: String) {
-        marketApps.select(id)
-        selectedPackageID = nil
-        search = ""
-    }
-    func removeMarketApp(_ app: MarketApp) {
-        marketApps.remove(app.id)
-        search = ""
-        selectedPackageID = nil
-    }
-    func openCodexMarket() {
-        page = "插件市场"
-        selectedPackageID = nil
-        let id = MarketApp.known(.codex).id
-        if marketApps.apps.contains(where:{ $0.id == id }) { selectMarketApp(id) }
-        else { addingMarketApp = true }
-    }
+    let target: PackageTarget = WeChatOverlayTarget.testMode ? .wechat : .codex
 
     @Published private(set) var exportingID: String?
     private var exportStarted = false
@@ -313,7 +275,7 @@ import UniformTypeIdentifiers
         let texts = ["waitingForHost":"等待 Codex 窗口接入","connected":"加载器已连接","waitingForCDP":"等待 Codex 连接","waitingForPage":"等待 Codex 页面",
                      "starting":"正在连接 Codex","disabled":"加载器已暂停","codexNotRunning":"Codex 未运行",
                      "restartRequired":"当前 Codex 未开启插件连接端口，需要重启 Codex。","launchingCodex":"正在连接 Codex","error":"加载器异常",
-                     "nodeMissing":"需要安装 Node.js 22 或更高版本"]
+                     "nodeMissing":"内置运行环境缺失，请重新安装 Packpier。"]
         connection = texts[state.status] ?? "等待加载器状态"
         #if PACKPIER_INDEPENDENT
         observeCodexStartup()
@@ -401,9 +363,8 @@ import UniformTypeIdentifiers
         else { picker.begin(completionHandler:completion) }
     }
     func showInstalled(for app: PackageTarget, matching id: String = "") {
-        let key = MarketApp.known(app).id
-        guard marketApps.apps.contains(where:{ $0.id == key }) else { return }
-        selectMarketApp(key)
+        guard app == target else { return }
+        search = ""
         selectedPackageID = id.isEmpty ? nil : id
         page = "插件市场"
     }
@@ -484,7 +445,6 @@ import UniformTypeIdentifiers
             error = PPText.format("已安装 %@ %@。请在插件目录更新源码后重新编译。",old.id,old.version)
             return
         }
-        if !marketApps.apps.contains(where:{ $0.target == .codex }) { addMarketApp(.known(.codex)) }
         showInstalled(for:.codex,matching:file.name)
         preview = nil
         awaitingTrust = file.name

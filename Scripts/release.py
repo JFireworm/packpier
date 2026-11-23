@@ -18,6 +18,7 @@ def main():
     if info["SUFeedURL"] != REPO + "/releases/latest/download/appcast.xml":
         raise SystemExit("Unexpected release feed")
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", app], check=True)
+    subprocess.run([ROOT / "Scripts/build-dmg.sh"], check=True)
     prefix = f"{REPO}/releases/download/v{version}/"
     account = os.environ.get("PACKPIER_SIGNING_ACCOUNT", "Packpier")
     with TemporaryDirectory(dir=ROOT / "build") as tmp:

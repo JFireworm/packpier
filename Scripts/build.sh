@@ -36,6 +36,7 @@ mkdir -p "$app/Contents/Resources/WindowHost"
 /usr/bin/ditto Loader/WindowHost/policy.mjs "$app/Contents/Resources/WindowHost/policy.mjs"
 cp Info.plist "$app/Contents/Info.plist"
 if [[ "${1:-}" == "--wechat-test" ]]; then
+    cp Plugins/WeChatCeladon/catalog.json "$app/Contents/Resources/Marketplace/catalog.json"
     /usr/bin/plutil -replace CFBundleIdentifier -string local.packpier.wechat-test "$app/Contents/Info.plist"
     /usr/bin/plutil -replace CFBundleDisplayName -string "Packpier WeChat Test" "$app/Contents/Info.plist"
     /usr/bin/plutil -insert PackpierWeChatTestMode -bool YES "$app/Contents/Info.plist"
@@ -45,6 +46,7 @@ if [[ -n "${PACKPIER_FEED_URL:-}${PACKPIER_PUBLIC_ED_KEY:-}" ]]; then
     /usr/bin/plutil -replace SUFeedURL -string "$PACKPIER_FEED_URL" "$app/Contents/Info.plist"
     /usr/bin/plutil -replace SUPublicEDKey -string "$PACKPIER_PUBLIC_ED_KEY" "$app/Contents/Info.plist"
 fi
+bash Scripts/bundle-node.sh "$app"
 /usr/bin/codesign --force --sign - "$app"
 /usr/bin/codesign --verify --deep --strict "$app"
 /usr/bin/cmp "$loader" "$app/Contents/Helpers/packpier-codex-loader"

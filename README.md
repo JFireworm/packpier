@@ -1,66 +1,42 @@
 # Packpier
 
-Packpier 是 macOS 上的插件管理器。在「插件市场」选择目标应用，点选插件即可查看效果示例、安装详情和运行状态。界面支持简体中文、English、日本語和 한국어。
+**简体中文** · [English](README.en.md)
 
-0.1.23（34）使用 Packpier 自研加载器，可直接在真实 Codex 窗口挂载 P-Sign、Prism 和自定义背景。窗口增强通过 Codex 自身的本机调试端口完成，不修改 Codex 的应用文件；退出 Packpier 后，注入的界面元素和事件监听会被清理。Prism 与自定义背景的 Node 服务需要本机安装 Node.js 22 或更高版本。
+Packpier 是 macOS 上的 Codex 插件管理器。插件市场展示每个插件在 Codex 中的位置、使用效果和运行状态。当前支持 Codex，其他目标应用的接入仍在开发中。
 
-| 应用 | 插件 | 可以做什么 |
-| --- | --- | --- |
-| Codex | P-Sign | 在左下角显示 P 和加载状态绿点。移入指针可换背景、打开背景设置。 |
-| Codex | Prism | 为项目和会话配色，按置顶顺序查看会话。 |
-| Codex | 自定义背景 | 使用本地或内置来源的图片，调节遮罩与磨砂，从收藏或最近使用中重新选图。 |
-| 微信 | 青瓷 | 为 Mac 微信 3.8.7（28249）的会话列表添加淡绿色层，需辅助功能权限。 |
-
-![自定义背景插件的市场效果示例](Resources/Marketplace/Previews/custom-background.png)
-
-### 开始使用
-
-打开 Packpier 后，在插件市场选择 Codex。P-Sign、Prism 和自定义背景是受保护的内置插件。选择插件可以查看该版本的权限说明。可导入本地 ZIP 查看、排序和保存源包。真实窗口只运行随 App 编译的三个内置效果。微信需要先通过「添加应用」加入市场。[青瓷使用说明](Plugins/WeChatCeladon/README.md)
-
-### 从源码构建
-
-准备 macOS 14 或以上、Xcode 和 npm。将 Sparkle 2.9.6 的完整框架放在 `build/Dependencies/Sparkle.framework`，也可通过 `SPARKLE_FRAMEWORK_PATH` 指定路径。构建脚本编译 `Loader/` 中的 Swift 源码，生成三个内置窗口效果的模块，签名应用后核对包内加载器与编译产物，并输出其 SHA-256。[Sparkle 发布页](https://github.com/sparkle-project/Sparkle/releases/tag/2.9.6)
-
-```sh
-./Scripts/build.sh
-open build/Packpier.app
-```
-
-### 窗口加载器
-
-加载器由 Swift 管理的插件库和 `Loader/WindowHost` 中的 Node 宿主组成。宿主读取 Codex 在本机 `127.0.0.1:9335` 暴露的调试端点，只选择 `app://-/index.html` 主窗口，注入 `window-effects.js`，并通过 CDP 绑定把页面里的 `snapshot`、`network.request` 等调用转发给插件包内的 Node 入口。Codex 退出或重新载入页面后，宿主会重新连接并挂载。
-
-打开 Codex 设置，在「外观」下方选择「自定义背景」。从 P-Sign 打开时，若设置窗口未打开，会显示独立面板。加载器会依次尝试 `PACKPIER_NODE`、`/opt/homebrew/bin/node`、`/usr/local/bin/node` 和 `~/.nvm` 下的最新版本；找不到 Node.js 时，插件管理仍可用，窗口效果保持等待。
-
-### 插件权限
-
-自研加载器按用户保存的顺序和开关选择 P-Sign、Prism、自定义背景。插件库可以保留其他插件的记录。
-
-自定义背景的内置图片来源会联网取图，收藏可写入用户的图片目录。Prism 在本机读取项目及会话归属并保存颜色。青瓷使用 macOS 辅助功能定位微信窗口。
-
-### 开发与验证
-
-| 路径 | 内容 |
+| 内置插件 | 在 Codex 里可以做什么 |
 | --- | --- |
-| `Sources/`、`Tests/` | macOS 主程序、适配器和集成检查 |
-| `Plugins/Prism/`、`Plugins/CustomBackground/` | Prism 与自定义背景的可读源码 |
-| `Resources/BundledPlugins/p-sign/` | P-Sign 的可读源码 |
-| `Plugins/WeChatCeladon/` | 青瓷的 Swift 包及测试 |
-| `Resources/Marketplace/` | 插件目录、效果预览与构建实际使用的 ZIP |
+| P-Sign | 把指针移到左下角带小绿点的 P 上。点图片图标换背景，点滑杆打开背景设置。 |
+| Prism | 在置顶、项目和最近会话中使用同一套颜色。可按项目聚合置顶会话，也可单独给一个会话选色。[查看 Prism 效果与操作](Plugins/Prism/README.md) |
+| 自定义背景 | 使用本地文件或内置图片，调整遮罩和磨砂，在收藏和最近使用中重新选图。入口在「设置 → 自定义背景」。 |
 
-自定义插件可从随应用提供的开发 Skill 开始。修改内置 Codex 插件时，需要同步更新对应的市场 ZIP。Prism 及 P-Sign 的清单在 ZIP 根目录，自定义背景的清单在 ZIP 内的 `custom-background/` 目录。版本号须与市场目录中的记录一致。[插件开发 Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
+![Prism 会话选色与项目选色示例](Resources/Marketplace/Previews/prism.png)
 
-在 macOS 上安装 Xcode、Node.js 22、Python 3、uv 和 Chrome。以下命令可从干净检出运行。设置 `CHROME_BIN` 可指定测试浏览器。
+### 安装
+
+1. 打开 [GitHub Releases](https://github.com/JFireworm/packpier/releases/latest)，选择适合这台 Mac 的安装文件。Apple Silicon 对应 arm64，最低系统版本为 macOS 14。
+2. 下载 DMG 后双击打开，将 **Packpier.app 拖到同一窗口中的 Applications（应用程序）**。复制完成后推出磁盘映像，从「应用程序」打开 Packpier。使用 v0.1.23 的 ZIP 时，解压后将 App 拖入「应用程序」。
+3. 打开插件市场。绿色表示已在 Codex 窗口中运行，空心圆表示等待，红色表示该插件报告错误。点选插件可以看到「安装详情」和错误原文。
+
+0.1.24 起，App 随附支持 SQLite 的 Node.js 运行时。0.1.23 使用本机的 Node.js，Prism 需要可直接导入 `node:sqlite` 的版本。若旧版提示 `No such built-in module: node:sqlite`，请使用包含运行时的安装包，或为旧版准备支持该模块的 Node.js。[Node.js SQLite 版本说明](https://nodejs.org/api/sqlite.html)
+
+「Codex 已运行，未检测到可用的本机连接」表示 Packpier 已找到 Codex 进程，窗口连接尚未建立。这个状态和 Prism 的 SQLite 错误可以同时出现。把 App 拖入「应用程序」后打开 Packpier，加载器会随主程序启动。在状态提示旁点「连接详情」；「插件加载器 · 已响应」表示主程序已收到加载器的回复，下方的「Codex 窗口」单独显示窗口连接结果。每个插件的启用开关与它是否已在窗口中运行分别显示。
+
+### 插件与数据
+
+三个内置插件受删除保护。插件市场支持导入、排序和保存本地插件 ZIP；正式版的 Codex 窗口效果由三个内置插件提供。Prism 在本机保存颜色，自定义背景的内置图片来源会联网，收藏可保存到用户的图片目录。[插件开发 Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
+
+### 构建、测试与更新
+
+在 macOS 上安装 Xcode、Node.js 22.13+、npm、Python 3、uv 和 Chrome。首次构建会校验下载的 Sparkle 框架和 Node.js 运行时。可用 `CHROME_BIN` 指定测试浏览器。
 
 ```sh
 make bootstrap
 make check
+open build/Packpier.app
+./Scripts/build-dmg.sh
 ```
 
-`make lint` 检查 JS、Swift、Python、Shell 和分发资源。`make unit` 覆盖原生界面逻辑、背景与青瓷。`make integration` 通过独立插件库、私有协议与临时浏览器配置验证导入、导出、删除、排序、背景设置和窗口效果。重新生成插件归档使用 `python3 Scripts/plugin-archives.py`。
+`make lint` 检查代码与分发资源，`make unit` 和 `make integration` 运行单元与集成测试。内置插件源码位于 [Prism](Plugins/Prism)、[自定义背景](Plugins/CustomBackground) 和 [P-Sign](Resources/BundledPlugins/p-sign)。修改插件后执行 `python3 Scripts/plugin-archives.py` 同步市场归档。
 
-### 下载与更新
-
-在「设置与更新」点「检查更新」。Sparkle 从 GitHub Releases 读取 appcast，比较构建号，提供安装已签名新版的按钮。自动更新偏好控制后台检查与下载。[项目主页](https://github.com/JFireworm/packpier) · [下载发行版](https://github.com/JFireworm/packpier/releases/latest)
-
-维护者构建后运行 `python3 Scripts/release.py`，使用专用钥匙串条目为 ZIP 和更新清单签名。可用 `PACKPIER_SIGNING_ACCOUNT` 指定已有的签名条目。将输出的 ZIP 和 `appcast.xml` 同时附在版本对应的 GitHub Release，再发布为 Latest。其他维护者可在本地构建中用 `PACKPIER_FEED_URL` 和 `PACKPIER_PUBLIC_ED_KEY` 指定自己的更新源和公钥。[第三方声明](THIRD_PARTY_NOTICES.md)
+在「设置与更新」点「检查更新」即可获取新版。维护者在构建后运行 `python3 Scripts/release.py`，将安装 DMG、Sparkle 更新用的 ZIP 和签名的 `appcast.xml` 一起上传到对应版本的 Release。Sparkle 使用钥匙串里的发布密钥，`PACKPIER_SIGNING_ACCOUNT` 可指定密钥条目。Apple Developer ID 签名和公证需另行完成。[MIT 许可证](LICENSE) · [第三方声明](THIRD_PARTY_NOTICES.md)

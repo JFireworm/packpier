@@ -19,9 +19,8 @@ import ServiceManagement
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = AppUpdates.shared
-        WeChatOverlay.shared.restore()
         if Bundle.main.object(forInfoDictionaryKey:"PackpierWeChatTestMode") as? Bool == true {
-            manager.addMarketApp(.known(.wechat))
+            WeChatOverlay.shared.restore()
             manager.showInstalled(for:.wechat)
             return
         }
@@ -142,14 +141,21 @@ struct Dashboard: View {
         .toolbarBackground(.hidden,for:.windowToolbar)
         .onDisappear { drag.cancel() }
         .preferredColorScheme(appearance == "system" ? nil : appearance == "dark" ? .dark : .light)
-        .sheet(isPresented:$m.addingMarketApp) { AddMarketApplication(m:m) }
         .popover(isPresented:$connectionInfo) {
             VStack(alignment:.leading,spacing:10) {
                 Text("连接详情").font(.headline)
-                Text(LocalizedStringKey(m.connection))
-                environmentRow("Node.js","nodeEnvironment",m.state.raw["checkingNode"] as? Bool == true)
-                environmentRow("Git","gitEnvironment",m.state.raw["checkingGit"] as? Bool == true)
-                Button("打开日志文件位置",action:m.revealLog)
+                LabeledContent("插件加载器") {
+                    Text(LocalizedStringKey(m.state.ready ? "已响应" : "尚未收到响应"))
+                }
+                LabeledContent("Codex 窗口") {
+                    Text(LocalizedStringKey(m.connection))
+                }
+                if let version = Bundle.main.object(forInfoDictionaryKey:"PackpierNodeVersion") as? String {
+                    LabeledContent("内置运行环境",value:"Node.js " + version)
+                }
+                if let detail = (m.state.raw["status"] as? Fields)?["message"] as? String, !detail.isEmpty {
+                    Text(verbatim:detail).font(.callout).textSelection(.enabled)
+                }
             }.padding(20)
         }
         .sheet(item:$m.preview) { item in importSheet(item) }
@@ -195,64 +201,40 @@ struct Dashboard: View {
          .help(LocalizedStringKey(collapsed ? "展开侧栏" : "收起侧栏"))
     }
 
-    var marketplace: some View {
-        Group {
-            if let app = m.marketApps.selected {
-                let targets = HStack(spacing:10) {
-                    Picker("目标应用",selection:Binding(get:{ app.id },set:{ m.selectMarketApp($0) })) {
-                        ForEach(m.marketApps.apps) { choice in Text(verbatim:choice.title).tag(choice.id) }
-                    }.accessibilityIdentifier("market.selection")
-                    addAppButton
-                }.fixedSize()
-                let actions = HStack(spacing:8) {
-                    if app.target == .codex {
-                        Button("安装插件包",systemImage:"arrow.down.to.line") { m.chooseFile() }
-                            .buttonStyle(.borderedProminent).tint(.blue)
-                            .accessibilityIdentifier("market.installPackage")
-                            .disabled(m.transferBusy || m.choosing || !m.state.ready)
-                    }
-                    CopyDeveloperSkillButton {
-                        do { try AuthorSkill.copy(); m.notice = "已复制 Skill 正文" }
-                        catch { m.error = "未能复制 Skill" }
-                    }
-                    if app.target == .codex {
-                        Menu {
-                            Toggle("启用加载器",isOn:Binding(get:{ m.state.enabled },set:{ m.send("setEnabled",["enabled":$0]) })).disabled(!m.state.ready)
-                            Button("重新扫描") { m.send("reloadPackages") }.disabled(!m.state.ready)
-                            Button("连接详情") { connectionInfo = true }
-                        } label: { Label("应用工具",systemImage:"slider.horizontal.3") }
-                    }
-                }.fixedSize()
-                ViewThatFits(in:.horizontal) {
-                    HStack { targets; Spacer(minLength:10); actions }
-                    VStack(alignment:.leading,spacing:8) {
-                        targets
-                        HStack { Spacer(); actions }
-                    }
-                }.zIndex(1)
-                if let target = app.target {
-                    MarketplacePage(m:m,drag:drag,target:target).id(app.id)
-                } else { ContentUnavailableView("此应用暂无插件包",systemImage:"shippingbox") }
-            } else {
-                VStack(spacing:14) {
-                    Image(systemName:"square.grid.2x2").font(.title).foregroundStyle(.secondary)
-                    Text("尚未添加应用").font(.headline)
-                    addAppButton
-                }.frame(maxWidth:.infinity,minHeight:210)
+    @ViewBuilder var marketplace: some View {
+        let targets = HStack(spacing:10) {
+            LabeledContent("目标应用") { Text(verbatim:PPText.get(m.target.displayName)) }
+                .fixedSize().accessibilityIdentifier("market.selection")
+            Button("添加应用（开发中）", systemImage:"plus") {}
+                .disabled(true).accessibilityIdentifier("market.add")
+        }.fixedSize()
+        let actions = HStack(spacing:8) {
+            if m.target == .codex {
+                Button("安装插件包",systemImage:"arrow.down.to.line") { m.chooseFile() }
+                    .buttonStyle(.borderedProminent).tint(.blue)
+                    .accessibilityIdentifier("market.installPackage")
+                    .disabled(m.transferBusy || m.choosing || !m.state.ready)
             }
-        }
-    }
-    private var addAppButton:some View {
-        Button("添加应用",systemImage:"plus"){ m.addingMarketApp = true }
-            .accessibilityIdentifier("market.add")
-    }
-    func environmentRow(_ title:String,_ key:String,_ checking:Bool) -> some View {
-        let env = m.state.raw[key] as? Fields
-        let version = env?["version"] as? String ?? ""
-        return HStack(spacing:6) {
-            Image(systemName:env != nil ? "checkmark.circle" : "circle.dotted").foregroundStyle(env != nil ? Color.green : Color.secondary)
-            Text(env != nil ? PPText.format("%@ %@ 可用",title,version) : title + " · " + PPText.get(checking ? "正在检测" : "未检测到")).font(.callout)
-        }
+            CopyDeveloperSkillButton {
+                do { try AuthorSkill.copy(); m.notice = "已复制 Skill 正文" }
+                catch { m.error = "未能复制 Skill" }
+            }
+            if m.target == .codex {
+                Menu {
+                    Toggle("启用加载器",isOn:Binding(get:{ m.state.enabled },set:{ m.send("setEnabled",["enabled":$0]) })).disabled(!m.state.ready)
+                    Button("重新扫描") { m.send("reloadPackages") }.disabled(!m.state.ready)
+                    Button("连接详情") { connectionInfo = true }
+                } label: { Label("应用工具",systemImage:"slider.horizontal.3") }
+            }
+        }.fixedSize()
+        ViewThatFits(in:.horizontal) {
+            HStack { targets; Spacer(minLength:10); actions }
+            VStack(alignment:.leading,spacing:8) {
+                targets
+                HStack { Spacer(); actions }
+            }
+        }.zIndex(1)
+        MarketplacePage(m:m,drag:drag,target:m.target,showConnection:{ connectionInfo = true })
     }
     func importSheet(_ file:LocalPackage) -> some View {
         let existing = m.state.packages.first(where: { $0.id == file.name })
@@ -264,7 +246,7 @@ struct Dashboard: View {
             if let reason = file.reason, !reason.isEmpty { NodePermissionDetails(packageID: file.name, reason: reason) }
             if let existing { Text("本机已有 \(existing.id) \(existing.version)。继续将使用已安装的副本。").foregroundStyle(.secondary) }
             HStack { Spacer(); Button("取消"){ m.preview = nil }.keyboardShortcut(.cancelAction)
-                Button(PPText.get(!m.marketApps.apps.contains(where:{ $0.target == .codex }) ? "添加 Codex 并使用此插件" : existing == nil ? "添加到 Codex 并启用" : "使用已安装的版本")){ m.confirmImport() }
+                Button(PPText.get(existing == nil ? "添加到 Codex 并启用" : "使用已安装的版本")){ m.confirmImport() }
                     .keyboardShortcut(.defaultAction).disabled(!m.state.ready || (existing != nil && existing?.version != file.version))
             }
         }.padding(25).frame(width:450)

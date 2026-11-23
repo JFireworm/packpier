@@ -1,0 +1,21 @@
+[
+  {
+    "id": "wechat-celadon",
+    "app": "wechat",
+    "version": "0.1.0",
+    "name": {
+      "zh-Hans": "青瓷",
+      "en": "Celadon",
+      "ja": "青磁",
+      "ko": "청자"
+    },
+    "summary": {
+      "zh-Hans": "在微信 3.8.7 的会话列表上切换淡绿色层。",
+      "en": "Toggle a pale green overlay on the WeChat 3.8.7 conversation list.",
+      "ja": "WeChat 3.8.7 の会話一覧に淡い緑色を重ねます。",
+      "ko": "WeChat 3.8.7의 대화 목록에 연녹색을 적용합니다."
+    },
+    "symbol": "circle.lefthalf.filled",
+    "source": "https://github.com/JFireworm/packpier/tree/main/Plugins/WeChatCeladon"
+  }
+]

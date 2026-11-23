@@ -270,3 +270,10 @@
 "Codex 本机端口可连接，窗口插件尚未接入" = "Codex is reachable locally. Window plugins are awaiting connection.";
 
 "Codex 已运行，未检测到可用的本机连接" = "Codex is running. No local connection detected.";
+"添加应用（开发中）" = "Add App (in development)";
+"内置运行环境缺失，请重新安装 Packpier。" = "The bundled runtime is missing. Reinstall Packpier.";
+"内置运行环境" = "Bundled runtime";
+"插件加载器" = "Plugin loader";
+"已响应" = "Responding";
+"尚未收到响应" = "No response yet";
+"Codex 窗口" = "Codex window";
