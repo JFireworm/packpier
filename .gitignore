@@ -1,0 +1,17 @@
+.DS_Store
+build/
+.build/
+.swiftpm/
+node_modules/
+.env
+.env.*
+*.p12
+*.p8
+*.pem
+*.key
+*.dmg
+*.app/
+*.log
+__pycache__/
+.ruff_cache/
+*.pyc

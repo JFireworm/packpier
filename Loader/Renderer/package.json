@@ -1,0 +1,10 @@
+{
+  "name": "packpier-window-effects",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild index.js --bundle --format=esm --loader:.css=text --outfile=../../build/Renderer/window-effects.mjs",
+    "build:host": "esbuild host.js --bundle --format=iife --loader:.css=text --outfile=../../build/Renderer/window-effects.iife.js"
+  },
+  "devDependencies": { "esbuild": "0.25.12" }
+}

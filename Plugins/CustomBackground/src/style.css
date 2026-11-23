@@ -1,0 +1,1485 @@
+/* Codex 自定义背景包：壁纸层、随机按钮、设置内容（全部以 data-packpier-cbgp-* 作用域） */
+/* 新版使用 data-theme；仅当该属性不存在时，才回退到 electron-light。 */
+
+/* ------------------------------ 壁纸层 ------------------------------ */
+
+[data-packpier-cbgp-wallpaper] {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* 图片、背景磨砂和颜色遮罩拆成独立层：背景磨砂只模糊原图，遮罩颜色
+   保持均匀；扩大图片层可避免高强度模糊在窗口边缘产生空白。 */
+[data-packpier-cbgp-wallpaper]::before,
+[data-packpier-cbgp-wallpaper]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+[data-packpier-cbgp-wallpaper]::before {
+  z-index: 0;
+  inset: calc(-1 * var(--ct-cbgp-background-frost-overscan, 0px));
+  background-image: var(--ct-cbgp-bg-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(var(--ct-cbgp-background-frost-blur, 0px));
+  transition: filter 180ms ease, inset 180ms ease;
+}
+
+[data-packpier-cbgp-wallpaper]::after {
+  z-index: 1;
+  inset: 0;
+  background-color: rgb(
+    var(--ct-cbgp-mask-light-rgb, 246 246 246) /
+    var(--ct-cbgp-mask-light-opacity, 0.72)
+  );
+}
+
+[data-packpier-cbgp-wallpaper][hidden] {
+  display: none;
+}
+
+[data-packpier-cbgp-window-frost] {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: rgb(255 255 255 / 0.24);
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-packpier-cbgp-window-frost]:not([hidden]) {
+  display: block;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) [data-packpier-cbgp-window-frost] {
+  background-color: rgb(20 20 24 / 0.3);
+}
+
+/* 透明来源仍保留壁纸层作为颜色遮罩与窗口底层磨砂的承载面，但不绘制
+   图片。背景磨砂在这里使用 backdrop-filter，因此可与控件磨砂独立组合。 */
+[data-packpier-cbgp-wallpaper][data-packpier-cbgp-transparent]::before {
+  inset: 0;
+  background-image: none;
+  filter: none;
+}
+
+:root[data-packpier-cbgp-background-frost]
+  [data-packpier-cbgp-wallpaper][data-packpier-cbgp-transparent] {
+  backdrop-filter:
+    blur(var(--ct-cbgp-background-frost-blur, 0px))
+    saturate(1.12);
+  -webkit-backdrop-filter:
+    blur(var(--ct-cbgp-background-frost-blur, 0px))
+    saturate(1.12);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) [data-packpier-cbgp-wallpaper]::after {
+  background-color: rgb(
+    var(--ct-cbgp-mask-dark-rgb, 20 20 24) /
+    var(--ct-cbgp-mask-dark-opacity, 0.76)
+  );
+}
+
+/* 聚焦和失焦时都保持透明画布，避免新版窗口底色盖住负层级的壁纸。 */
+:root[data-packpier-cbgp-theme],
+:root[data-packpier-cbgp-theme] body {
+  background-color: transparent !important;
+}
+
+/* Codex raises its macOS backdrop on blur, covering the image in Stage Manager. */
+:root[data-packpier-cbgp-theme]:not([data-packpier-cbgp-transparent]) .macos-window-backdrop {
+  opacity: 0 !important;
+}
+
+/* 新版桌面壳在窗口框架与工作区分别绘制 page surface；这些叠加底色
+   会遮住壁纸。只清除壳层，保留菜单、卡片和输入框的原生表面令牌。 */
+:root[data-packpier-cbgp-theme] [data-app-shell-page-surface="true"],
+:root[data-packpier-cbgp-theme] [data-app-shell-surface-backing="true"],
+:root[data-packpier-cbgp-theme] [data-app-shell-frame][data-app-shell-workspace-tab-chrome],
+:root[data-packpier-cbgp-theme] .app-shell-left-panel:not([data-app-shell-left-panel-appearance="content-surface"]) {
+  background-color: transparent !important;
+}
+
+/* 新版壳层另外叠加深色渐变；仅改 background-color 仍会压暗壁纸。 */
+:root[data-packpier-cbgp-theme] [data-app-shell-page-surface="true"] {
+  background-image: none !important;
+}
+
+/* surface 是弹窗、卡片、输入框和 sticky 内容共用的原生令牌，不能全局
+   改成半透明。页面底色使用包内变量，并只应用在主工作区壳层上；嵌套
+   data-theme 继续保留各自的原生表面，避免弹窗透出后方聊天内容。 */
+:root[data-packpier-cbgp-theme] {
+  --ct-cbgp-page-surface: rgba(255, 255, 255, 0.1);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light))[data-packpier-cbgp-theme] {
+  --ct-cbgp-page-surface: rgba(20, 20, 24, 0.14);
+}
+
+:root[data-packpier-cbgp-theme] [data-app-shell-main-surface="default"] {
+  background-color: var(--ct-cbgp-page-surface) !important;
+}
+
+/* 分栏和侧边聊天有独立面板底板，新标签页另外使用 canvas 表面。 */
+:root[data-packpier-cbgp-theme] [class*="--app-shell-panel-background"],
+:root[data-packpier-cbgp-theme] [data-app-shell-tab-panel-controller],
+:root[data-packpier-cbgp-theme] [data-new-tab-scroll-root],
+:root[data-packpier-cbgp-theme] [data-app-shell-pane-content-viewport] > [class~="bg-surface"] {
+  background-color: transparent !important;
+}
+
+/* 工具面板共用一层位于内容后方的磨砂。滤镜不放在内容祖先上，
+   侧边聊天的输入框仍可独立模糊滚动到其后方的文字。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-app-shell-tab-panel-controller] {
+  isolation: isolate;
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-app-shell-tab-panel-controller]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--ct-cbgp-page-surface);
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+:root[data-packpier-cbgp-theme] [data-app-shell-tab-panel-controller]
+  :is([class~="electron:bg-surface"], [class~="bg-surface"][class~="h-full"],
+      [style*="background-color: var(--color-codex-terminal-background)"]) {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 文件树和 diff 使用 Shadow DOM；通过组件提供的背景变量穿透，
+   不清除选中状态、语法颜色或增删行标记。 */
+:root[data-packpier-cbgp-theme] [data-app-shell-tab-panel-controller] {
+  --codex-diffs-surface-override: transparent;
+}
+
+:root[data-packpier-cbgp-theme] [data-app-shell-tab-panel-controller] file-tree-container {
+  --trees-bg-override: transparent;
+  background-color: transparent !important;
+}
+
+:root[data-packpier-cbgp-theme] [data-app-shell-tab-panel-controller] diffs-container {
+  /* 宿主在 shadow 内按 surface 重算代码底色；只在此叶子组件覆盖。 */
+  --color-surface: transparent;
+  --diffs-bg: transparent !important;
+  background-color: transparent !important;
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-app-shell-tab-panel-controller] [class~="group/file-diff"] > [class~="sticky"] {
+  background-color: var(--ct-cbgp-composer-frost-surface) !important;
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+/* dot 的嵌入聊天在内外 thread-pane 上绘制底色；只清除画布，气泡和
+   Customize your dot 弹窗继续使用原生实体表面。 */
+:root[data-packpier-cbgp-theme] .messaging-root.messaging-embedded,
+:root[data-packpier-cbgp-theme]
+  .messaging-root.messaging-embedded .thread-pane {
+  background-color: transparent !important;
+}
+
+/* dot 用 12px 实色下边框为输入框留底部间距，透明画布上会显成白条。 */
+:root[data-packpier-cbgp-theme] .messaging-root.messaging-embedded .composer-wrap {
+  border-bottom-color: transparent !important;
+}
+
+:root[data-packpier-cbgp-theme] .messaging-root.messaging-embedded .composer-disclaimer {
+  background-color: transparent !important;
+}
+
+/* 新版页面壳的 clip-path 会把内部磨砂限制在独立的 backdrop 中，部分
+   聊天文字和图片因此原样穿过输入框。用原生 overflow 和逻辑圆角裁剪，
+   保留侧栏接缝与外侧圆角，同时让输入框采样完整的聊天画面。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-app-shell-page-sidebar="true"]
+  [data-app-shell-main-surface="default"] {
+  clip-path: none !important;
+  border-start-end-radius: var(--app-shell-main-surface-clip-end-radius, var(--radius-xl-base, 12px));
+  border-end-end-radius: var(--app-shell-main-surface-clip-end-radius, var(--radius-xl-base, 12px));
+}
+
+/* 页面顶部和 dot 浮动头像栏各有渐隐装饰层。工作区露出壁纸后，原生
+   surface 渐变会形成白色横带，只移除这些渐变，不修改共享表面令牌。 */
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-main-content-top-fade]
+  > [aria-hidden="true"],
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-main-surface="default"]
+  [class~="pointer-events-none"][class~="w-[anchor-size(width)]"][class*="_background_"],
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-main-surface="default"]
+  [aria-hidden="true"][class~="pointer-events-none"][class~="w-[anchor-size(width)]"][class*="_floatingHeader_"],
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-tab-panel-controller] [class*="_background_"] {
+  background-image: none !important;
+}
+
+/* dot 头像的原生白色渐隐遮罩在壁纸上形成光晕，只清除头像背后的装饰层。 */
+:root[data-packpier-cbgp-theme]
+  [class~="group/orbit-profile"] [class~="before:mask-content-safe-area"]::before {
+  background-color: transparent !important;
+}
+
+/* 会话页将输入框后的保护层拆为 footer 下的实体底板和独立渐变。
+   用语义属性和渐变起点定位，不依赖 CSS 模块的类名格式。
+   只清除不可交互的装饰层，输入框和提示条继续使用各自的材质。 */
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-main-surface="default"]
+  [data-thread-scroll-footer="true"]
+  > [aria-hidden="true"][class~="pointer-events-none"][class~="bg-surface"] {
+  background-color: transparent !important;
+}
+
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-main-surface="default"]
+  [aria-hidden="true"][class~="pointer-events-none"][class~="from-surface"] {
+  background-image: none !important;
+}
+
+/* 控件磨砂与背景磨砂使用不同标记。这里只覆盖 Codex 的面板/柔和控件
+   语义令牌；ghost hover 令牌保持原生值，避免选项高亮再次被改写。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost] {
+  --color-background-panel: rgba(255, 255, 255, 0.5) !important;
+  --color-background-primary-soft: rgba(255, 255, 255, 0.64) !important;
+  --color-background-primary-soft-alpha: rgba(255, 255, 255, 0.58) !important;
+  --ct-cbgp-control-frost-surface: rgba(255, 255, 255, 0.62);
+  --ct-cbgp-composer-frost-surface: rgba(255, 255, 255, 0.5);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light))[data-packpier-cbgp-theme][data-packpier-cbgp-frost] {
+  --color-background-panel: rgba(34, 34, 40, 0.54) !important;
+  --color-background-primary-soft: rgba(38, 38, 46, 0.64) !important;
+  --color-background-primary-soft-alpha: rgba(42, 42, 50, 0.6) !important;
+  --ct-cbgp-control-frost-surface: rgba(38, 38, 46, 0.66);
+  --ct-cbgp-composer-frost-surface: rgba(38, 38, 46, 0.56);
+}
+
+/* 通话等局部深色面板必须使用自己的磨砂底色，不能继承浅色窗口材质。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost] [data-theme="dark"] {
+  --ct-cbgp-control-frost-surface: rgba(38, 38, 46, 0.78);
+  --ct-cbgp-composer-frost-surface: rgba(38, 38, 46, 0.66);
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost] [data-theme="light"] {
+  --ct-cbgp-control-frost-surface: rgba(255, 255, 255, 0.62);
+  --ct-cbgp-composer-frost-surface: rgba(255, 255, 255, 0.5);
+}
+
+/* 侧边标签的选中底板和浏览器工具栏不在聊天内容树中，单独使用磨砂。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-app-shell-titlebar] [data-tab-id] > [class*="_SelectedSurface_"],
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-app-shell-tab-panel-controller] [class~="bg-surface"]:has(> div > [data-browser-sidebar-toolbar]) {
+  background-color: var(--ct-cbgp-composer-frost-surface) !important;
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+/* 工具栏胶囊用渐变绘制底色，单改 background-color 不会生效。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-app-shell-tab-panel-controller] [class*="_controlSurface_"] {
+  background-image: none !important;
+  background-color: var(--ct-cbgp-composer-frost-surface) !important;
+}
+
+/* Composer 使用独立变量绘制材质；默认变体会明确关闭 backdrop-filter。
+   覆盖这些局部变量，让会话页根节点与首页内层圆角 Body 各自在原生绘制层
+   上应用磨砂，避免给首页布局壳额外叠加矩形底板。inline 变体保持透明。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-composer-surface-variant]:not([data-composer-surface-variant="inline"], [data-composer-surface-variant="document"]) {
+  --composer-layout-surface-background: var(--ct-cbgp-composer-frost-surface) !important;
+  --composer-layout-surface-backdrop-filter:
+    blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14) !important;
+}
+
+/* 在实际材质层直接声明，避免宿主的局部主题或样式覆盖变量后的绘制结果。
+   首页只处理圆角 Body；其外层仍是透明布局壳。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-composer-surface-variant]:not([data-composer-surface-variant="inline"], [data-composer-surface-variant="document"], [data-composer-utility-bar-variant="home"]),
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-composer-utility-bar-variant="home"][data-composer-surface-variant]:not([data-composer-surface-variant="inline"], [data-composer-surface-variant="document"])
+  [data-composer-body] {
+  background-color: var(--ct-cbgp-composer-frost-surface) !important;
+  background-image: none !important;
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14) !important;
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14) !important;
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  :is(
+    [style*="--color-background-panel"],
+    [class~="bg-primary-soft-alpha"],
+    [class*="bg-background-primary-soft/"],
+    .ct-cbgp-select-trigger
+  ) {
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  .ct-cbgp-select-trigger,
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [class~="bg-primary-soft-alpha"]:not(:hover):not([data-state="open"]) {
+  background-color: var(--ct-cbgp-control-frost-surface) !important;
+}
+
+/* 输入框上方的额度/提示条与输入框同属一个 composer 控件族，统一使用
+   控件磨砂材质，圆角与描边仍由宿主负责。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-codex-composer-root]
+  aside[class~="bg-surface"] {
+  background-color: var(--ct-cbgp-control-frost-surface) !important;
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+/* 聊天区域里的任务卡片、待发送队列和错误提示同样使用 surface。
+   直接给这些控件绘制磨砂，不改共享令牌；装饰底板和弹窗不参与覆盖。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-includes-composer="true"]
+  :is([class~="bg-surface"], [class~="bg-surface-elevated-primary"], [class~="bg-surface-elevated-secondary"]):where(:not([aria-hidden="true"], [role="dialog"], [role="dialog"] *, dialog, dialog *, [data-summary-panel-variant], [data-summary-panel-variant] *)),
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  .messaging-root.messaging-embedded
+  :is(.attachment-conversation-card, .attachment-shared-conversation-card, .composer-upload, .conversation-footer .typing-indicator:not(:empty)) {
+  background-color: var(--ct-cbgp-control-frost-surface) !important;
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+/* 滚动记录中的卡片保留半透明底色，但不逐个采样、模糊背后的整段内容。
+   固定输入框、待发送队列和侧栏不在记录容器中，继续使用独立磨砂。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  :is([data-thread-find-target="conversation"], .messaging-root.messaging-embedded .message-list)
+  :is(
+    [style*="--color-background-panel"],
+    [class~="bg-primary-soft-alpha"],
+    [class*="bg-background-primary-soft/"],
+    [class~="bg-surface"],
+    [class~="bg-surface/70"],
+    [class~="bg-surface-elevated-primary"],
+    [class~="bg-surface-elevated-secondary"],
+    .attachment-conversation-card,
+    .attachment-shared-conversation-card
+  ):where(:not([role="dialog"], [role="dialog"] *, dialog, dialog *, [data-composer-surface-variant], [data-composer-surface-variant] *)) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 文件行复用卡片底色，避免再叠 70% 白色；悬浮高亮仍由原生样式提供。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-includes-composer="true"] [class~="group/turn-diff-file-row"]
+  button[class~="bg-surface/70"]:not(:hover) {
+  background-color: transparent !important;
+}
+
+/* 首页建议卡片原本把 ghost hover 当作叠加色使用；基础表面透明后需单独
+   提供实体悬浮材质，但不能修改全局 ghost hover，否则菜单和列表也会变色。 */
+:root[data-packpier-cbgp-theme]
+  main
+  section
+  button[class~="bg-surface"][class~="rounded-2xl"][class~="hover:bg-primary-ghost-hover"]:hover {
+  background-color: rgba(255, 255, 255, 0.78) !important;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light))[data-packpier-cbgp-theme]
+  main
+  section
+  button[class~="bg-surface"][class~="rounded-2xl"][class~="hover:bg-primary-ghost-hover"]:hover {
+  background-color: rgba(48, 48, 56, 0.78) !important;
+}
+
+/* 停靠侧栏与标题栏、外圈共用底层磨砂，避免内外侧栏叠出不同白度。
+   浮动侧栏使用下方独立外壳材质。 */
+:root[data-packpier-cbgp-theme] .app-shell-left-panel {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  .app-shell-left-panel:not([data-slate-sidebar-peeking="true"])
+  :is([data-slate-sidebar-content], .sidebar-navigation) {
+  background-color: transparent !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 右侧任务摘要与 dot 资料卡共用整张卡片的材质。内部标题、行背景及
+   装饰渐变不再重复叠加白色；不改变原生按钮的悬浮和选中状态。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost] [data-summary-panel-variant] {
+  /* 使用卡片自己的主题，通话卡片在浅色窗口中也可能是深色。 */
+  background-color: color-mix(in srgb, var(--color-surface-elevated-secondary) 50%, transparent) !important;
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-summary-panel-variant] :is([class~="bg-surface"], [class~="bg-surface-elevated-secondary"]),
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-summary-panel-variant] [class~="before:bg-surface-elevated-secondary"]::before {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-summary-panel-variant] [class~="from-surface-elevated-secondary"] {
+  background-image: none !important;
+}
+
+/* 收起侧边栏后，Codex 会在外壳上动画 opacity 与 transform。opacity 小于
+   1 时外壳会成为 Backdrop Root，因此磨砂必须与动画放在同一个外壳上；
+   放在内层 aside 会在动画结束前无法采样主内容，并在终点突然跳变。 */
+:root[data-packpier-cbgp-theme]
+  [data-pip-obstacle="app-shell-floating-left-panel"] {
+  border-radius: 8px;
+  background-color: rgba(246, 246, 246, 0.72);
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light))[data-packpier-cbgp-theme]
+  [data-pip-obstacle="app-shell-floating-left-panel"] {
+  background-color: rgba(20, 20, 24, 0.72);
+}
+
+:root[data-packpier-cbgp-theme]
+  [data-testid="app-shell-floating-left-panel"] {
+  background-color: transparent !important;
+}
+
+/* Inline library and plugin headers paint their sticky surface on a pseudo-element. */
+:root[data-packpier-cbgp-theme]:not([data-packpier-cbgp-transparent])
+  :is([class~="@container/skills-grid"] [data-app-shell-inline-page-header],
+      [data-app-shell-inline-page-header]:has(> div > [class*="--page-content-gutter"]))
+  > div > [data-expand-search][data-sticky="true"]::before {
+  background-color: color-mix(in srgb, var(--color-surface) 58%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+/* Only clear the full-height sites list, leaving the thumbnail backgrounds intact. */
+:root[data-packpier-cbgp-theme]:not([data-packpier-cbgp-transparent])
+  [data-app-shell-inline-page-header] > div > [class*="--page-content-gutter"]
+  > .mx-auto.min-h-full.bg-surface {
+  background-color: transparent;
+}
+
+/* ------------------ 设置页内容 ------------------ */
+
+/* 设置容器通过原生直接子层识别，首帧生效且不依赖 DOM observer。
+   不用 :has(> .scrollbar-stable) 作后代控件的祖先条件：聊天切页时该
+   关系选择器也会扩大样式失效范围，造成额外的整页样式重算。 */
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-focus-area="main"] > .relative.isolate
+  > [class~="electron:bg-surface"][class~="electron:overflow-hidden"][class~="windows:rounded-tl-lg"] {
+  background-color: transparent !important;
+}
+
+/* 设置页固定搜索栏去掉实体底板与白色渐变，搜索控件保留磨砂。 */
+:root[data-packpier-cbgp-theme][data-packpier-cbgp-frost]
+  [data-app-shell-focus-area="main"] > .relative.isolate
+  > [class~="electron:bg-surface"][class~="electron:overflow-hidden"][class~="windows:rounded-tl-lg"]
+  :is([class~="bg-surface"], [class~="bg-page-search"], th):where(:not([role="dialog"], [role="dialog"] *, dialog, dialog *)) {
+  background-color: var(--ct-cbgp-control-frost-surface) !important;
+  backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+  -webkit-backdrop-filter: blur(var(--ct-cbgp-frost-blur, 17px)) saturate(1.14);
+}
+
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-focus-area="main"] > .relative.isolate
+  > [class~="electron:bg-surface"][class~="electron:overflow-hidden"][class~="windows:rounded-tl-lg"]
+  [class~="sticky"][class~="bg-surface"] {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-focus-area="main"] > .relative.isolate
+  > [class~="electron:bg-surface"][class~="electron:overflow-hidden"][class~="windows:rounded-tl-lg"]
+  [class~="after:from-surface"]::after {
+  background-image: none !important;
+}
+
+[data-packpier-cbgp-settings-panel] {
+  width: min(100%, 720px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 24px 28px 44px;
+  color: inherit;
+}
+
+[data-packpier-cbgp-settings-panel] * {
+  box-sizing: border-box;
+}
+
+[data-packpier-cbgp-settings-panel] [hidden] {
+  display: none !important;
+}
+
+.ct-cbgp-pane-header {
+  margin-bottom: 20px;
+}
+
+.ct-cbgp-pane-header h1 {
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.ct-cbgp-subline {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.ct-cbgp-section {
+  margin-bottom: 26px;
+}
+
+.ct-cbgp-section h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+/* 背景图默认会平铺且从 padding 盒起算，cover 缩放后描边下方会露出相邻
+   一块图像的边缘，在圆角边上显成一圈暗线。改为从 border 盒铺满且不平铺，
+   半透明描边只作为叠在图像边缘上的细线。 */
+.ct-cbgp-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background-color: rgba(128, 128, 128, 0.12);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  border: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.ct-cbgp-preview.ct-cbgp-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ct-cbgp-preview.ct-cbgp-empty::after {
+  content: attr(data-empty-label);
+  font-size: 13px;
+  opacity: 0.55;
+}
+
+.ct-cbgp-preview.ct-cbgp-transparent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.34);
+  background-image: conic-gradient(
+    rgba(116, 116, 124, 0.16) 0 25%,
+    rgba(255, 255, 255, 0.44) 0 50%,
+    rgba(116, 116, 124, 0.16) 0 75%,
+    rgba(255, 255, 255, 0.44) 0
+  );
+  background-size: 20px 20px;
+  background-repeat: repeat;
+}
+
+.ct-cbgp-preview.ct-cbgp-transparent::after {
+  content: attr(data-empty-label);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  color: rgba(28, 28, 32, 0.84);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-preview.ct-cbgp-transparent {
+  background-color: rgba(28, 28, 34, 0.34);
+  background-image: conic-gradient(
+    rgba(255, 255, 255, 0.1) 0 25%,
+    rgba(34, 34, 40, 0.4) 0 50%,
+    rgba(255, 255, 255, 0.1) 0 75%,
+    rgba(34, 34, 40, 0.4) 0
+  );
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-preview.ct-cbgp-transparent::after {
+  background: rgba(40, 40, 46, 0.82);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ct-cbgp-current-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ct-cbgp-chip {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #2563eb;
+  font-weight: 500;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-chip {
+  background: rgba(96, 165, 250, 0.18);
+  color: #93c5fd;
+}
+
+.ct-cbgp-time {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.ct-cbgp-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.ct-cbgp-tool-button {
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(255, 255, 255, 0.8);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-tool-button {
+  background: rgba(52, 52, 60, 0.8);
+}
+
+.ct-cbgp-tool-button:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-tool-button:hover {
+  background: rgba(72, 72, 82, 1);
+}
+
+.ct-cbgp-tool-button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.ct-cbgp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ct-cbgp-field-label {
+  flex: 0 0 auto;
+  font-size: 13px;
+  opacity: 0.8;
+  min-width: 88px;
+}
+
+.ct-cbgp-select-control {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  z-index: 0;
+}
+
+.ct-cbgp-select-control[data-open] {
+  z-index: 40;
+}
+
+.ct-cbgp-select-trigger {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 11px 0 12px;
+  border: 1px solid rgba(82, 82, 92, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.62);
+  color: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 1px 2px rgba(24, 24, 28, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 180ms ease;
+}
+
+.ct-cbgp-select-trigger:hover {
+  border-color: rgba(82, 82, 92, 0.34);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.ct-cbgp-select-trigger:focus-visible {
+  outline: none;
+  border-color: rgba(10, 106, 255, 0.72);
+  box-shadow:
+    0 0 0 3px rgba(10, 106, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.ct-cbgp-select-control[data-open] .ct-cbgp-select-trigger {
+  border-color: rgba(10, 106, 255, 0.54);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 0 0 3px rgba(10, 106, 255, 0.1),
+    0 3px 10px rgba(24, 24, 28, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.ct-cbgp-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ct-cbgp-select-chevron {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  opacity: 0.5;
+  transition:
+    transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 160ms ease;
+}
+
+.ct-cbgp-select-control[data-open] .ct-cbgp-select-chevron {
+  transform: rotate(180deg);
+  opacity: 0.76;
+}
+
+.ct-cbgp-select-menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  left: 0;
+  max-height: min(280px, 50vh);
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(82, 82, 92, 0.18);
+  border-radius: 12px;
+  background: rgba(248, 248, 250, 0.86);
+  box-shadow:
+    0 18px 46px rgba(18, 18, 22, 0.18),
+    0 3px 10px rgba(18, 18, 22, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(24px) saturate(1.24);
+  -webkit-backdrop-filter: blur(24px) saturate(1.24);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate3d(0, -5px, 0) scale(0.98);
+  transform-origin: top center;
+  transition:
+    opacity 150ms ease,
+    transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
+    visibility 0s linear 220ms;
+}
+
+.ct-cbgp-select-control[data-open] .ct-cbgp-select-menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition-delay: 0s;
+}
+
+.ct-cbgp-select-option {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 110ms ease,
+    color 110ms ease;
+}
+
+.ct-cbgp-select-option:hover,
+.ct-cbgp-select-option:focus-visible {
+  outline: none;
+  background: rgba(10, 106, 255, 0.1);
+}
+
+.ct-cbgp-select-option[aria-selected="true"] {
+  background: rgba(10, 106, 255, 0.13);
+  color: rgb(0, 83, 204);
+  font-weight: 500;
+}
+
+.ct-cbgp-select-option[aria-selected="true"]:hover,
+.ct-cbgp-select-option[aria-selected="true"]:focus-visible {
+  background: rgba(10, 106, 255, 0.18);
+}
+
+.ct-cbgp-select-check {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  opacity: 0;
+  transform: scale(0.72);
+  transition:
+    opacity 140ms ease,
+    transform 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.ct-cbgp-select-option[aria-selected="true"] .ct-cbgp-select-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-trigger {
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(42, 42, 49, 0.66);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(50, 50, 58, 0.78);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-control[data-open] .ct-cbgp-select-trigger {
+  border-color: rgba(77, 156, 255, 0.62);
+  background: rgba(52, 52, 60, 0.84);
+  box-shadow:
+    0 0 0 3px rgba(77, 156, 255, 0.13),
+    0 3px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-menu {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(38, 38, 45, 0.88);
+  box-shadow:
+    0 20px 52px rgba(0, 0, 0, 0.42),
+    0 3px 12px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-option:hover,
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-option:focus-visible {
+  background: rgba(77, 156, 255, 0.14);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-option[aria-selected="true"] {
+  background: rgba(77, 156, 255, 0.18);
+  color: rgb(142, 196, 255);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-option[aria-selected="true"]:hover,
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-option[aria-selected="true"]:focus-visible {
+  background: rgba(77, 156, 255, 0.24);
+}
+
+.ct-cbgp-mask-controls {
+  display: grid;
+  grid-template-columns: 34px 64px minmax(96px, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ct-cbgp-frost-controls {
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ct-cbgp-color-input {
+  width: 34px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-color-input {
+  background: rgba(46, 46, 54, 0.8);
+}
+
+.ct-cbgp-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.ct-cbgp-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.ct-cbgp-color-input:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.ct-cbgp-color-value,
+.ct-cbgp-range-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.68;
+}
+
+.ct-cbgp-color-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 滑杆为 14px 圆角轨道，白点嵌在进度末端。拇指是与轨道等高的透明圆，
+   中心随取值在 [7px, 100% - 7px] 间移动；填充画到拇指右缘，末端用同心
+   圆补出圆角，白点始终落在圆角端头正中。线性层与圆角层在端头重叠，
+   填充色必须不透明，否则重叠处会叠深。 */
+.ct-cbgp-range {
+  --ct-cbgp-range-accent: #3b82f6;
+  --ct-cbgp-range-muted: #b2b2b8;
+  --ct-cbgp-range-track: rgba(0, 0, 0, 0.08);
+  --ct-cbgp-range-dot: #ffffff;
+  --ct-cbgp-range-ring: rgba(59, 130, 246, 0.28);
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-range {
+  --ct-cbgp-range-accent: #4d9cff;
+  --ct-cbgp-range-muted: #5e5e66;
+  --ct-cbgp-range-track: rgba(255, 255, 255, 0.1);
+  --ct-cbgp-range-dot: #ffffff;
+  --ct-cbgp-range-ring: rgba(77, 156, 255, 0.34);
+}
+
+.ct-cbgp-range::-webkit-slider-runnable-track {
+  --ct-cbgp-range-paint: var(--ct-cbgp-range-accent);
+  --ct-cbgp-range-cap: calc(7px + (100% - 14px) * var(--ct-cbgp-range-progress, 0));
+  height: 14px;
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      circle 7px at var(--ct-cbgp-range-cap) 50%,
+      var(--ct-cbgp-range-paint) 6.5px,
+      transparent 7px
+    ),
+    linear-gradient(
+      to right,
+      var(--ct-cbgp-range-paint) var(--ct-cbgp-range-cap),
+      transparent var(--ct-cbgp-range-cap)
+    ),
+    var(--ct-cbgp-range-track) !important;
+}
+
+.ct-cbgp-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle 3.5px,
+    var(--ct-cbgp-range-dot) 3px,
+    transparent 3.5px
+  );
+  box-shadow: 0 0 0 0 var(--ct-cbgp-range-ring);
+  transition:
+    transform 160ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 160ms ease;
+}
+
+.ct-cbgp-range:not(:disabled):hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+.ct-cbgp-range:not(:disabled):active::-webkit-slider-thumb {
+  transform: scale(1.25);
+}
+
+.ct-cbgp-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--ct-cbgp-range-ring);
+}
+
+.ct-cbgp-range:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.ct-cbgp-range:disabled::-webkit-slider-runnable-track {
+  --ct-cbgp-range-paint: var(--ct-cbgp-range-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ct-cbgp-range::-webkit-slider-thumb {
+    transition: none;
+  }
+}
+
+.ct-cbgp-frost-controls:has(.ct-cbgp-range:disabled) .ct-cbgp-range-value {
+  opacity: 0.36;
+}
+
+.ct-cbgp-range-value {
+  text-align: right;
+}
+
+.ct-cbgp-note {
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.62;
+  margin: 4px 0 0;
+  max-width: 560px;
+}
+
+.ct-cbgp-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+}
+
+.ct-cbgp-history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.ct-cbgp-history-card:hover .ct-cbgp-history-thumb {
+  transform: scale(1.03);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.ct-cbgp-history-thumb {
+  object-fit: cover;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background-color: rgba(128, 128, 128, 0.14);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ct-cbgp-history-label {
+  font-size: 11px;
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ct-cbgp-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ct-cbgp-toggle {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(128, 128, 128, 0.34);
+  background: rgba(128, 128, 128, 0.24);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 150ms ease;
+  flex: 0 0 auto;
+}
+
+.ct-cbgp-toggle .ct-cbgp-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 150ms ease;
+}
+
+.ct-cbgp-toggle[data-on] {
+  background: radial-gradient(circle at 30% 30%, #60a5fa, #2563eb);
+  border-color: transparent;
+}
+
+.ct-cbgp-toggle[data-on] .ct-cbgp-toggle-knob {
+  transform: translateX(16px);
+}
+
+/* 减少动态效果偏好 */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-packpier-cbgp-wallpaper],
+  [data-packpier-cbgp-wallpaper]::before,
+  [data-packpier-cbgp-wallpaper]::after,
+  .ct-cbgp-tool-button {
+    transition: none;
+  }
+
+  .ct-cbgp-select-trigger,
+  .ct-cbgp-select-chevron,
+  .ct-cbgp-select-menu,
+  .ct-cbgp-select-option,
+  .ct-cbgp-select-check {
+    transition: none;
+  }
+
+  .ct-cbgp-select-menu {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ct-cbgp-select-trigger,
+  .ct-cbgp-select-menu {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .ct-cbgp-select-trigger {
+    background: rgb(248, 248, 250);
+  }
+
+  .ct-cbgp-select-menu {
+    background: rgb(248, 248, 250);
+  }
+
+  :root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-trigger,
+  :root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-select-menu {
+    background: rgb(38, 38, 45);
+  }
+}
+
+/* ------------------------------ 历史右键菜单 ------------------------------ */
+
+[data-packpier-cbgp-context-menu] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  color: inherit;
+  pointer-events: auto;
+  min-width: 160px;
+  z-index: 90;
+  padding: 5px;
+  border-radius: 10px;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) [data-packpier-cbgp-context-menu] {
+  background: rgba(38, 38, 44, 0.96);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.ct-cbgp-context-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ct-cbgp-context-item:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.14);
+  color: #2563eb;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-context-item:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.2);
+  color: #93c5fd;
+}
+
+.ct-cbgp-context-item:disabled {
+  cursor: progress;
+  opacity: 0.58;
+}
+
+.ct-cbgp-context-item:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* ------------------------------ 操作反馈 ------------------------------ */
+
+[data-packpier-cbgp-action-toast] {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 95;
+  max-width: min(420px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  padding: 9px 13px;
+  border: 1px solid rgba(128, 128, 128, 0.26);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #202124;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(14px) saturate(1.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+}
+
+[data-packpier-cbgp-action-toast][data-tone="error"] {
+  color: #991b1b;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) [data-packpier-cbgp-action-toast] {
+  background: rgba(38, 38, 44, 0.94);
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light))
+  [data-packpier-cbgp-action-toast][data-tone="error"] {
+  color: #fecaca;
+}
+
+/* ------------------------------ 确认对话框 ------------------------------ */
+
+[data-packpier-cbgp-confirm-dialog] {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 20, 24, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.ct-cbgp-confirm-dialog {
+  width: min(360px, 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(255, 255, 255, 0.97);
+  color: #202124;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+  padding: 18px 20px 16px;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-confirm-dialog {
+  background: rgba(38, 38, 44, 0.97);
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.ct-cbgp-confirm-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ct-cbgp-confirm-message {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.82;
+}
+
+.ct-cbgp-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ct-cbgp-confirm-button {
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(255, 255, 255, 0.9);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-confirm-button {
+  background: rgba(52, 52, 60, 0.9);
+}
+
+.ct-cbgp-confirm-button:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-confirm-button:hover {
+  background: rgba(72, 72, 82, 1);
+}
+
+.ct-cbgp-confirm-button-primary {
+  border-color: transparent;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.ct-cbgp-confirm-button-primary:hover {
+  background: #b91c1c;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-confirm-button-primary {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+:root:is([data-theme="dark"], :not([data-theme], .electron-light)) .ct-cbgp-confirm-button-primary:hover {
+  background: #dc2626;
+}
+
+.ct-cbgp-confirm-button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* B3 uses the same grid for both shelves. Empty columns keep their width. */
+.ct-cbgp-work {
+  display: grid;
+  grid-template-columns: minmax(0, 2.25fr) minmax(196px, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 22px;
+}
+[data-packpier-cbgp-settings-panel] { container-type: inline-size; }
+@container (max-width: 500px) {
+  .ct-cbgp-work { grid-template-columns: minmax(0, 1fr); }
+}
+.ct-cbgp-work .ct-cbgp-preview {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  padding: 14px;
+  box-sizing: border-box;
+}
+.ct-cbgp-work .ct-cbgp-preview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ct-preview-tint);
+  backdrop-filter: blur(var(--ct-preview-blur, 0px));
+  z-index: -1;
+}
+.ct-cbgp-bubble { align-self: flex-start; padding: 5px 10px; font-size: 12px; background: #1e2b37d9; color: white; border-radius: 9px; }
+.ct-cbgp-preview[data-theme="light"] .ct-cbgp-bubble:first-child { background: #ffffffde; color:#182432; }
+.ct-cbgp-bubble + .ct-cbgp-bubble { align-self: flex-end; background:#2568abbf; }
+.ct-cbgp-inspector { min-width: 0; container: background-inspector / inline-size; }
+.ct-cbgp-inspector .ct-cbgp-section { margin-bottom: 8px; }
+.ct-cbgp-inspector .ct-cbgp-section > h2 { margin-bottom: 6px; }
+.ct-cbgp-inspector .ct-cbgp-field-label { min-width: 0; }
+.ct-cbgp-inspector .ct-cbgp-row { gap: 7px; flex-wrap: wrap; }
+.ct-cbgp-inspector .ct-cbgp-mask-row { display: block; }
+.ct-cbgp-inspector .ct-cbgp-mask-controls { width: 100%; display: flex; gap: 6px; }
+.ct-cbgp-inspector .ct-cbgp-color-value { display: none; }
+.ct-cbgp-inspector .ct-cbgp-range { min-width: 30px; }
+@container background-inspector (max-width: 235px) {
+  .ct-cbgp-inspector .ct-cbgp-frost-row { display: grid; gap: 4px; }
+  .ct-cbgp-inspector .ct-cbgp-select-control { flex-basis: 100%; }
+}
+.ct-cbgp-themes { display: flex; gap: 5px; margin: 8px 0; }
+.ct-cbgp-themes button { flex: 1; padding: 4px; }
+.ct-cbgp-themes [aria-pressed="true"] { outline: 1px solid #4c93ec; }
+.ct-cbgp-advanced > summary { cursor: pointer; font-size: 13px; padding: 5px 0; }
+.ct-cbgp-advanced[open] > summary { margin-bottom: 9px; }
+.ct-cbgp-history-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 116px), 1fr)); }
+.ct-cbgp-history-grid > .ct-cbgp-note { grid-column: 1 / -1; }
+.ct-cbgp-tile { position: relative; min-width: 0; }
+.ct-cbgp-tile .ct-cbgp-history-card { width: 100%; }
+.ct-cbgp-tile .ct-cbgp-history-thumb { display: block; box-sizing: border-box; }
+.ct-cbgp-tile .ct-cbgp-history-card:hover .ct-cbgp-history-thumb { transform: none; }
+.ct-cbgp-history-card[aria-pressed="true"] .ct-cbgp-history-thumb { outline: 2px solid #438df1; }
+.ct-cbgp-history-card[aria-pressed="true"]::after {
+  content: "✓"; position: absolute; right: 6px; bottom: 6px; width: 18px; line-height: 18px;
+  border-radius: 50%; text-align:center; background: #2379e7; color:white; pointer-events:none;
+}
+.ct-cbgp-star { position: absolute; right: 5px; top: 5px; height: 25px; width: 25px; border: none;
+  border-radius: 6px; background: #132331b5; color: white; cursor: pointer; font: 18px/1 system-ui; }
+.ct-cbgp-star[aria-pressed="true"] { color:#ffd15b; }

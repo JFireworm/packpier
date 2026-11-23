@@ -1,0 +1,21 @@
+{
+  "name": "prism",
+  "version": "0.1.12",
+  "description": "在 Codex 左栏按原生置顶顺序显示排行榜，支持项目聚合、会话与项目自选色和最近使用。",
+  "type": "module",
+  "dependencies": {},
+  "packpier": {
+    "apiVersion": 3,
+    "entrypoints": {
+      "renderer": "renderer.js",
+      "node": "backend.js"
+    },
+    "priority": 100,
+    "permissions": {
+      "node": {
+        "reason": "读取本机 Codex 项目和会话归属、加载器语言设置和系统语言偏好，将配色保存在 Prism 数据目录。"
+      }
+    }
+  },
+  "homepage": "https://github.com/JFireworm/packpier/tree/main/Plugins/Prism"
+}

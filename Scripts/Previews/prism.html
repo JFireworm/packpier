@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>Prism</title>
+<style>
+* { box-sizing: border-box }
+body {
+  --ink:#273746; --muted:#50667a; --canvas:#edf0f2; --surface:#fafbfc; --hover:#e7e9eb; --border:#cbd5df;
+  margin:0; background:var(--canvas); color:var(--ink); font:17px/1.4 -apple-system,"PingFang SC",sans-serif;
+}
+body.dark { --ink:#eef3f7; --muted:#b3c0c9; --canvas:#293238; --surface:#20282d; --hover:#393e43; --border:#465059 }
+main { width:960px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; padding:24px }
+h2 { margin:0 0 10px; font-size:20px }
+article { height:344px; border:1px solid var(--border); border-radius:11px; padding:12px 9px; background:var(--surface) }
+header,.group,.child { display:flex; align-items:center; height:36px; padding:0 8px; gap:8px }
+.group { height:38px }
+header { justify-content:space-between; font-size:15px; color:var(--muted); font-weight:600 }
+small { font-size:14px; color:var(--muted) }
+p { font-size:14px; color:var(--muted); margin:10px 0 0 }
+.row { min-width:0; height:38px; display:grid; align-items:center; gap:6px; padding:0 5px; border-radius:7px }
+.thread { grid-template-columns:12px 21px minmax(0,1fr) 84px }
+.active { background:var(--hover) }
+.grip { width:12px; height:18px; background:radial-gradient(circle,#97a3ac 1.45px,transparent 1.6px) 0 0/6px 6px }
+.rank { font:14px/1 ui-monospace,monospace; text-align:center; color:var(--muted) }
+.title { padding:3px 8px; border-radius:5px }
+.active .title { background:var(--pick); color:#17171b; font-weight:500 }
+.project { grid-template-columns:20px minmax(0,1fr) 84px; padding-left:9px; border-left:3px solid transparent }
+.project.active { border-color:var(--pick) }
+.project.active .folder { color:var(--pick) }
+svg { display:block; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linejoin:round; stroke-linecap:round }
+.folder { width:18px; height:18px }
+.actions { display:grid; grid-template-columns:repeat(3,1fr); justify-items:center; align-items:center; color:var(--muted) }
+.actions i { width:14px; height:14px; border:1.4px solid #fafafa; border-radius:4px; background:var(--pick) }
+.child { padding-left:33px }
+.below { position:relative; padding-top:4px }
+.picker { position:absolute; top:7px; right:2px; width:244px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px; box-shadow:0 4px 10px #17222c19; font-size:14px }
+.colors { display:grid; grid-template-columns:repeat(8,1fr); gap:4px; margin:8px 0 }
+.colors i,.recent i,.recent b { aspect-ratio:1; display:grid; place-items:center; border-radius:4px; font-style:normal; color:#202428; font-weight:700 }
+.recent,.reset { color:var(--muted); font-size:13px }
+.recent { display:flex; align-items:center; gap:5px; border-top:1px solid var(--border); padding-top:7px }
+.recent i,.recent b { width:17px }
+.recent i { background:#56d4fa } .recent b { border:1px dashed var(--muted); color:var(--muted) } .reset { margin-top:6px }
+</style>
+<svg width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true">
+  <symbol id="pin" viewBox="0 0 20 20"><path d="m13 2 5 5-3 1-3 5-2 .5-2-2-5 6 4-7-2-2 .5-2 5-2z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="archive" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="4" rx="1"/><path d="M4 8v8h12V8M8 10h4"/></symbol>
+  <symbol id="more" viewBox="0 0 20 20"><g fill="currentColor" stroke="none"><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/></g></symbol>
+  <symbol id="edit" viewBox="0 0 20 20"><path d="M8 4H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-3M9 12l1-4 6-6 2 2-6 7z"/></symbol>
+  <symbol id="folder" viewBox="0 0 20 20"><path d="M2 6V5a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Zm0 1h16"/></symbol>
+</svg>
+<main>
+<section style="--pick:#EF79E5"><h2>会话选色</h2><article>
+<header>置顶 ﹀ <small>按项目聚合 ﹀</small></header><div class="group">⌄ 潮汐图册 <small>2</small></div>
+<div class="row thread active"><i class="grip"></i><span class="rank">03</span><span class="title">整理观测笔记</span><span class="actions" data-icons="pin archive"></span></div>
+<div class="below"><div class="row thread"><i class="grip"></i><span class="rank">04</span><span class="title">校对潮位刻度</span></div><div class="picker" data-label="会话"></div></div>
+</article><p>移到会话行，点右侧色块，更改会话色条。</p></section>
+<section style="--pick:#FFA153"><h2>项目选色</h2><article><header>项目 ﹀</header>
+<div class="row project"><svg class="folder"><use href="#folder"/></svg>潮汐图册</div>
+<div class="row project active"><svg class="folder"><use href="#folder"/></svg>纸鸢工坊<span class="actions" data-icons="more edit"></span></div>
+<div class="below"><div class="child">检查折线位置</div><div class="child">试排春季色卡</div><div class="picker" data-label="项目"></div></div>
+</article><p>移到项目行，点右侧色块，更改文件夹和左侧标记的颜色。</p></section>
+</main>
+<script>
+document.body.classList.toggle("dark", location.hash === "#dark");
+for (const actions of document.querySelectorAll(".actions")) {
+  actions.innerHTML = "<i></i>" + actions.dataset.icons.split(" ").map(id => '<svg><use href="#'+id+'"/></svg>').join("");
+}
+const colors = ["#62A1FF","#8C87FF","#B47BFA","#EF79E5","#FF79A9","#FF746F","#FFA153","#FFD059","#E0EE69","#A7E85D","#69DA83","#4FDCB4","#44DDD9","#56D4FA","#F2B68B","#A9C1E1"];
+for (const picker of document.querySelectorAll(".picker")) {
+  const label = picker.dataset.label;
+  const selected = getComputedStyle(picker).getPropertyValue("--pick").trim();
+  const chips = colors.map(color => '<i style="background:'+color+'">'+(color === selected ? '✓' : '')+'</i>').join("");
+  picker.innerHTML = '<strong>'+label+'主题色</strong><div class="colors">'+chips+'</div><div class="recent">最近使用<i></i><b>＋</b></div><div class="reset">'+(label === '会话' ? '继承项目色　' : '')+'恢复默认色</div>';
+}
+</script>
+</html>

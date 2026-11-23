@@ -1,0 +1,45 @@
+{
+  "name": "custom-background",
+  "version": "1.3.18",
+  "description": "为 Codex 设置透明背景、内置图片或本地图片，并在 Codex 设置中提供「自定义背景」页面。",
+  "keywords": [
+    "packpier",
+    "codex",
+    "theme"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/JFireworm/packpier/tree/main/Plugins/CustomBackground",
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/*.test.js"
+  },
+  "packpier": {
+    "apiVersion": 3,
+    "entrypoints": {
+      "renderer": "src/index.js",
+      "node": "src/node.js"
+    },
+    "priority": 100,
+    "packageDependencies": {},
+    "permissions": {
+      "node": {
+        "reason": "用于获取背景图片、将收藏存入「图片/Packpier/收藏」、将导出图片写入「下载」，并调用 macOS 图像工具把图片复制到系统剪贴板。"
+      }
+    },
+    "ui": {
+      "settingsSections": {
+        "apiVersion": 1,
+        "required": false,
+        "items": [
+          {
+            "id": "custom-background",
+            "title": "自定义背景",
+            "group": "personal",
+            "icon": "personalization",
+            "after": "personalization"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>local.packpier.manager</string>
+<key>CFBundleName</key><string>Packpier</string>
+<key>CFBundleDisplayName</key><string>Packpier</string>
+<key>CFBundleExecutable</key><string>Packpier</string>
+<key>CFBundleIconFile</key><string>Packpier.icns</string>
+<key>CFBundleIconName</key><string>AppIcon</string>
+<key>CFBundleDevelopmentRegion</key><string>zh-Hans</string>
+<key>CFBundleLocalizations</key><array><string>zh-Hans</string><string>en</string><string>ja</string><string>ko</string></array>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>0.1.23</string>
+<key>CFBundleVersion</key><string>34</string>
+<key>SUFeedURL</key><string>https://github.com/JFireworm/packpier/releases/latest/download/appcast.xml</string>
+<key>SUPublicEDKey</key><string>3ol+kC6YLEyy831CXHzbjFcvlWd2EUChGrx6tbNpinI=</string>
+<key>SUVerifyUpdateBeforeExtraction</key><true/>
+<key>SURequireSignedFeed</key><true/>
+<key>SUEnableAutomaticChecks</key><true/>
+<key>SUAllowsAutomaticUpdates</key><true/>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSMultipleInstancesProhibited</key><true/>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+</dict></plist>
