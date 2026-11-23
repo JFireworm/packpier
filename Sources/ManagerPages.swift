@@ -101,6 +101,7 @@ private struct LoginItemRow: View {
         failure = nil
         do {
             if enabled { try service.register() } else { try service.unregister() }
+            LoginItemDefaults.finish(.standard)
         } catch {
             failure = PPText.format("登录项设置失败（%@）",error.localizedDescription)
         }

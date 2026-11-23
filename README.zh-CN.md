@@ -30,6 +30,8 @@ Packpier 是 macOS 上的 Codex 插件管理器。插件市场展示每个插件
 2. 下载 DMG 后双击打开，将 **Packpier.app 拖到同一窗口中的 Applications（应用程序）**。复制完成后推出磁盘映像，从「应用程序」打开 Packpier。使用 v0.1.23 的 ZIP 时，解压后将 App 拖入「应用程序」。
 3. 打开插件市场。绿色表示已在 Codex 窗口中运行，空心圆表示等待，红色表示该插件报告错误。点选插件可以看到「安装详情」和错误原文。
 
+全新安装后，从「应用程序」首次打开 Packpier，它会向 macOS 注册登录项。如果显示「等待 macOS 允许登录启动」，可在「设置与更新」点「打开登录项设置」完成批准。「自动更新」默认开启，也可以在同一页调整。
+
 0.1.24 起，App 随附支持 SQLite 的 Node.js 运行时。0.1.23 使用本机的 Node.js，Prism 需要可直接导入 `node:sqlite` 的版本。若旧版提示 `No such built-in module: node:sqlite`，请使用包含运行时的安装包，或为旧版准备支持该模块的 Node.js。[Node.js SQLite 版本说明](https://nodejs.org/api/sqlite.html)
 
 「Codex 已运行，未检测到可用的本机连接」表示 Packpier 已找到 Codex 进程，窗口连接尚未建立。这个状态和 Prism 的 SQLite 错误可以同时出现。把 App 拖入「应用程序」后打开 Packpier，加载器会随主程序启动。在状态提示旁点「连接详情」；「插件加载器 · 已响应」表示主程序已收到加载器的回复，下方的「Codex 窗口」单独显示窗口连接结果。每个插件的启用开关与它是否已在窗口中运行分别显示。

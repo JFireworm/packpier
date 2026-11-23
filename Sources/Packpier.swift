@@ -9,8 +9,11 @@ import ServiceManagement
         guard let domain = Bundle.main.bundleIdentifier,
               Bundle.main.object(forInfoDictionaryKey:"PackpierWeChatTestMode") as? Bool != true else { return }
         let service = SMAppService.mainApp
+        let location = Bundle.main.bundleURL
+        let readOnly = try? location.resourceValues(forKeys:[.volumeIsReadOnlyKey]).volumeIsReadOnly
         do {
-            try LoginItemDefaults.apply(defaults: .standard, domain: domain, status: service.status) {
+            try LoginItemDefaults.apply(defaults: .standard, domain: domain, status: service.status,
+                                        canRegister: readOnly != true && !location.pathComponents.contains("AppTranslocation")) {
                 try service.register()
             }
         } catch {

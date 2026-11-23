@@ -30,6 +30,8 @@ The same conversation with two different wallpapers. Select either image to see 
 2. Open the DMG and **drag Packpier.app onto Applications in the same window**. Eject the disk image and open Packpier from Applications. For the v0.1.23 ZIP, extract the app and drag it to Applications.
 3. In the marketplace, green means a plugin is running in a Codex window, an empty circle means waiting and red indicates a plugin error. Select a plugin to read its installation details and error message.
 
+On a fresh install, open Packpier from Applications once to register it as a login item. If macOS asks for approval, open Login Items from Packpier’s Settings & Updates. Automatic updates are enabled by default and can be changed on the same screen.
+
 Starting with 0.1.24, Packpier includes a Node.js runtime with SQLite support. Version 0.1.23 uses a system runtime. If Prism reports `No such built-in module: node:sqlite`, use a build with the bundled runtime or provide a compatible Node.js installation for the older release. [Node.js SQLite version history](https://nodejs.org/api/sqlite.html)
 
 If Codex is running but Packpier cannot find a local connection, it has found the process and is still waiting for a usable window connection. A plugin dependency error can occur at the same time. After copying the app to Applications, open Packpier to start the bundled loader. In Connection Details, “Plugin loader: Responding” confirms that the app has received a reply from its helper. The Codex window row reports the window connection separately. Each plugin also shows its own enable switch and runtime status.

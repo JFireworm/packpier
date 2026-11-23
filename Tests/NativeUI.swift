@@ -1,8 +1,43 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
 
 @MainActor enum NativeUI {
+    static func checkLoginItemRetry() throws {
+        let suite = "packpier-login-test-" + UUID().uuidString
+        let prefs = UserDefaults(suiteName:suite)!
+        defer { prefs.removePersistentDomain(forName:suite) }
+        var attempts = 0
+        var failRegistration = true
+        func start(_ status: SMAppService.Status, installed: Bool = true) throws {
+            try LoginItemDefaults.apply(defaults:prefs, domain:suite, status:status, canRegister:installed) {
+                attempts += 1
+                if failRegistration { throw CocoaError(.fileWriteNoPermission) }
+            }
+        }
+        prefs.set("en", forKey:"packpier.language")
+        try start(.notRegistered, installed:false)
+        prefs.set("frame", forKey:"NSWindow Frame manager")
+        try start(.notFound)
+        guard attempts == 0 else { throw PackpierError.message("Uninstalled app registered as a login item") }
+        do {
+            try start(.notRegistered)
+            throw PackpierError.message("Missing system registration error")
+        } catch let error as CocoaError where error.code == .fileWriteNoPermission {}
+        failRegistration = false
+        try start(.notRegistered)
+        try start(.notRegistered)
+        guard attempts == 2 else { throw PackpierError.message("Login registration retry or opt-out failed") }
+        for status: SMAppService.Status in [.enabled, .requiresApproval] {
+            prefs.removePersistentDomain(forName:suite)
+            try start(status)
+            try start(.notRegistered)
+        }
+        guard attempts == 2 else { throw PackpierError.message("Repeated a registered login request") }
+    }
+
     static func checkTime() throws {
+        try checkLoginItemRetry()
         let raw = "2026-11-21T13:33:01.724321Z [INFO] 2024-03-17T12:00:00Z\nnext line\n2026-11-21T02:01:00-05:00 [WARN] ok"
         let china = LogTimestamps.display(raw,in:TimeZone(identifier:"Asia/Shanghai")!)
         guard china == "2026-11-21 21:33:01.724 [INFO] 2024-03-17T12:00:00Z\nnext line\n2026-11-21 15:01:00 [WARN] ok" else { throw PackpierError.message(china) }
