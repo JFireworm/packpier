@@ -4,8 +4,6 @@
 
 Packpier is a native macOS plugin manager for the Codex desktop app. It installs, orders, enables and removes plugins, and mounts their effects directly in a running Codex window. Version 0.1.28 uses a Swift host and native services, so the three built-in plugins work without installing Node.js.
 
-![Packpier marketplace](docs/images/prism-sidebar.png)
-
 ## Built-in plugins
 
 | Plugin | What it does in Codex |

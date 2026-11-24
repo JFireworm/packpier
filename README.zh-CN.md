@@ -4,8 +4,6 @@
 
 Packpier 是 Codex 桌面端的 macOS 原生插件管理器：安装、排序、启停和移除插件，并把插件效果直接挂到正在运行的 Codex 窗口里。0.1.28 使用 Swift 原生宿主和原生服务，三个内置插件都不需要安装 Node.js。
 
-![Packpier 插件市场](docs/images/prism-sidebar.png)
-
 ## 内置插件
 
 | 插件 | 在 Codex 里可以做什么 |
