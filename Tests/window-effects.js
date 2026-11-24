@@ -5,6 +5,58 @@ import { createWindowEffects } from "../build/Renderer/window-effects.mjs";
 function check(value, detail) {
   if (!value) throw Error(detail);
 }
+
+function checkTransparentWindow(effects, storageKey) {
+  const fixture = document.createElement("div");
+  fixture.innerHTML = `<style>
+      #top-fade, #footer-fade::before { background-image: linear-gradient(transparent, white); }
+      #footer-fade::before, #footer-fade::after { content: ""; }
+      #footer-fade::after, #composer, #dialog { background-color: white; }
+    </style>
+    <div class="macos-window-backdrop" style="opacity: 0"></div>
+    <section data-app-shell-main-surface="default">
+      <div id="top-fade" aria-hidden="true" class="pointer-events-none bg-[image:var(--app-shell-content-fade,linear-gradient(to_bottom,currentColor,transparent))]"></div>
+      <div data-app-action-timeline-scroll>
+        <div id="footer-fade" class="pointer-events-none absolute">
+          <div data-thread-scroll-footer="true">
+            <div data-thread-composer-backdrop><textarea id="composer" data-composer-body></textarea></div>
+          </div>
+        </div>
+      </div>
+      <div id="dialog" role="dialog" class="bg-surface"></div>
+    </section>`;
+  document.body.append(fixture);
+  const backdrop = fixture.querySelector(".macos-window-backdrop");
+  const topFade = fixture.querySelector("#top-fade");
+  const footerFade = fixture.querySelector("#footer-fade");
+  const paint = () => ({
+    backdrop: getComputedStyle(backdrop).opacity,
+    topFade: getComputedStyle(topFade).backgroundImage,
+    footerFade: getComputedStyle(footerFade, "::before").backgroundImage,
+    footerFill: getComputedStyle(footerFade, "::after").backgroundColor,
+  });
+  const nativePaint = paint();
+  const previous = localStorage.getItem(storageKey);
+  localStorage.setItem(storageKey, JSON.stringify({ kind: "transparent" }));
+  effects.apply({ enabled: true, packages: [{ id: "custom-background" }] });
+  check(document.documentElement.hasAttribute("data-packpier-cbgp-transparent"), "Transparent mode did not mount");
+  for (const opacity of ["1", "0"]) {
+    backdrop.style.opacity = opacity;
+    const actual = paint();
+    check(actual.backdrop === "0" && actual.topFade === "none" && actual.footerFade === "none" &&
+      actual.footerFill === "rgba(0, 0, 0, 0)", `Native decorations are visible at backdrop opacity ${opacity}: ${JSON.stringify(actual)}`);
+  }
+  for (const selector of ["#composer", "#dialog"]) {
+    check(getComputedStyle(fixture.querySelector(selector)).backgroundColor === "rgb(255, 255, 255)",
+      `Background override affected ${selector}`);
+  }
+  effects.close();
+  backdrop.style.opacity = "0";
+  check(JSON.stringify(paint()) === JSON.stringify(nativePaint), "Disabling the effect did not restore native decorations");
+  localStorage.setItem(storageKey, previous);
+  fixture.remove();
+}
+
 async function run() {
   document.documentElement.lang = "zh-CN";
   document.body.innerHTML = `<nav data-app-navigation-rail><div><div><div><button aria-haspopup="menu">Usage</button></div><div>Profile</div></div></div></nav>
@@ -83,6 +135,7 @@ async function run() {
   check(document.querySelectorAll("[data-packpier-plugin]").length === 0, "Plugin elements survived shutdown");
   check(![...document.querySelectorAll("[style]")].some(el => el.style.getPropertyValue("--prism-native-color")),
     "Prism row colors survived shutdown");
+  checkTransparentWindow(effects, storageKey);
   const host = globalThis.__PACKPIER__;
   const navState = { enabled: true, packages: [{id:"p-sign"}, {id:"custom-background"}] };
   const many = Array.from({length: 64}, (_, i) => ({
