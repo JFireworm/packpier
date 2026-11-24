@@ -2,7 +2,7 @@
 
 **简体中文** · [English](README.md)
 
-Packpier 是 Codex 桌面端的 macOS 原生插件管理器：安装、排序、启停和移除插件，并把插件效果直接挂到正在运行的 Codex 窗口里。0.1.28 使用 Swift 原生宿主和原生服务，三个内置插件都不需要安装 Node.js。
+Packpier 是 Codex 桌面端的 macOS 原生插件管理器：安装、排序、启停和移除插件，并把插件效果直接挂到正在运行的 Codex 窗口里。0.1.30 使用 Swift 原生宿主和原生服务，三个内置插件都不需要安装 Node.js。
 
 ## 内置插件
 
@@ -80,7 +80,9 @@ PACKPIER_ARCH=x86_64 ./Scripts/build.sh
 PACKPIER_ARCH=x86_64 ./Scripts/build-dmg.sh
 ```
 
-Intel App 输出到 `build/x86_64/Packpier.app`，安装包为 `build/Packpier-0.1.29-macOS-x86_64.dmg`。Intel 版嵌入相同的 Sparkle 框架。现有发布源提供 arm64 更新 ZIP。维护者可以通过 `PACKPIER_FEED_URL` 和 `PACKPIER_PUBLIC_ED_KEY` 指定兼容 Intel 的签名更新源。
+Intel App 输出到 `build/x86_64/Packpier.app`，安装包为 `build/Packpier-0.1.30-macOS-x86_64.dmg`。Intel 版嵌入相同的 Sparkle 框架。现有发布源提供 arm64 更新 ZIP。维护者可以通过 `PACKPIER_FEED_URL` 和 `PACKPIER_PUBLIC_ED_KEY` 指定兼容 Intel 的签名更新源。
+
+Packpier 0.1.30 提供 **Windows x64 预览版**，可在只读插件市场查看插件版本和说明。Codex 集成、安装和启用插件功能由 macOS 版提供。见 [Windows 运行说明](Windows/README.md)与[移植计划](docs/windows-port.md)。
 
 `make lint` 检查源码和分发文件，`make unit` 和 `make integration` 运行测试。内置插件源码位于 [Prism](Plugins/Prism)、[自定义背景](Plugins/CustomBackground) 和 [P-Sign](Resources/BundledPlugins/p-sign)。修改插件后执行 `python3 Scripts/plugin-archives.py` 同步市场归档。
 
