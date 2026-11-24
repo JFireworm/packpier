@@ -166,9 +166,47 @@ async function checkTransparentWindow(effects, storageKey) {
   fixture.remove();
 }
 
+function checkPSignUpdateButton(rail, sign) {
+  const usage = rail.querySelector("button");
+  const update = document.createElement("span");
+  update.innerHTML = '<button type="button">Update available</button>';
+
+  function checkTargets() {
+    const anchor = sign.querySelector(".pp-sign-anchor");
+    let previousBottom = 0;
+    for (const button of [anchor, ...rail.querySelectorAll("button")]) {
+      const rect = button.getBoundingClientRect();
+      const name = button.getAttribute("aria-label") || button.textContent;
+      check(rect.top >= previousBottom, name + " overlaps the preceding rail button");
+      check(button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)),
+        name + " does not receive pointer input at its center");
+      previousBottom = rect.bottom;
+    }
+  }
+  checkTargets();
+  const initialTop = sign.getBoundingClientRect().top;
+  usage.before(update);
+  checkTargets();
+  usage.remove();
+  checkTargets();
+  update.after(usage);
+  update.remove();
+  checkTargets();
+  check(sign.getBoundingClientRect().top === initialTop, "P-Sign did not return after the update button disappeared");
+}
+
 async function run() {
   document.documentElement.lang = "zh-CN";
-  document.body.innerHTML = `<nav data-app-navigation-rail><div><div><div><button aria-haspopup="menu">Usage</button></div><div>Profile</div></div></div></nav>
+  document.body.innerHTML = `<style>
+      nav[data-app-navigation-rail] { position: fixed; left: 8px; bottom: 4px; width: 36px; }
+      .rail-stack { display: flex; flex-direction: column; gap: 8px; }
+      .rail-stack button { width: 36px; height: 36px; padding: 0; }
+      .rail-stack span { display: inline-flex; }
+    </style>
+    <nav data-app-navigation-rail><div><div class="rail-stack">
+      <div class="rail-stack"><button aria-haspopup="menu">Usage</button></div>
+      <div><button aria-haspopup="menu">Profile</button></div>
+    </div></div></nav>
     <aside data-sidebar-navigation-root><section data-app-action-sidebar-section data-app-action-sidebar-section-heading="Recents">
       <div data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="sample" data-app-action-sidebar-thread-kind="local">Sample chat</div>
     </section><section data-app-action-sidebar-section data-app-action-sidebar-section-heading="Pinned">
@@ -227,6 +265,8 @@ async function run() {
     },
   });
   const state = window.fixtureState;
+  const rail = document.querySelector("nav[data-app-navigation-rail]");
+  const nativeRailHeight = rail.getBoundingClientRect().height;
   const result = effects.apply(state);
   check(result.mounted.join() === "p-sign,prism,custom-background", JSON.stringify(result));
   await new Promise(resolve => setTimeout(resolve, 100));
@@ -264,6 +304,7 @@ async function run() {
   check(!wallpaper.hidden && wallpaper.style.cssText.includes("first.webp"), "Missing wallpaper");
   const sign = document.querySelector(".packpier-p-sign");
   check(getComputedStyle(sign).display !== "none", "P-Sign hidden");
+  checkPSignUpdateButton(rail, sign);
   sign.dispatchEvent(new Event("pointerenter"));
   const [image, settings] = sign.querySelectorAll('[role="toolbar"] button');
   check(!image.closest("[hidden]"), "Hover tray hidden");
@@ -278,6 +319,7 @@ async function run() {
   check(sign === document.querySelector(".packpier-p-sign"), "Unexpected remount");
   const withoutSign = effects.apply({ ...state, packages: state.packages.filter(p => p.id !== "p-sign") });
   check(withoutSign.mounted.join() === "prism,custom-background" && !sign.isConnected, "P-Sign did not stop independently");
+  check(rail.getBoundingClientRect().height === nativeRailHeight, "Stopping P-Sign left a gap in the rail");
   check(row.style.getPropertyValue("--prism-native-color") === "#FF79A9" &&
     !wallpaper.hidden && wallpaper.isConnected, "Stopping P-Sign affected Prism or the wallpaper");
   check(JSON.parse(localStorage.getItem(storageKey)).favorites[0].file === favorite.file, "Stopping P-Sign lost a favorite");

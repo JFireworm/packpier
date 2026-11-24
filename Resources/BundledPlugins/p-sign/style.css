@@ -1,22 +1,20 @@
-/* Use the native controls as anchors so zooming and window resizing keep all three centers aligned. */
-nav[data-app-navigation-rail] > :last-child > :only-child > :first-child > button[aria-haspopup="menu"] {
-  anchor-name: --packpier-usage;
-}
-nav[data-app-navigation-rail] > :last-child > :only-child > :last-child {
-  anchor-name: --packpier-profile;
-}
 .packpier-p-sign { display: none; }
-@supports (position-anchor: --packpier-profile) {
-  :root:has(nav[data-app-navigation-rail] > :last-child button[aria-haspopup="menu"]) .packpier-p-sign {
-    display: grid;
-    position: fixed;
-    position-anchor: --packpier-profile;
-    position-visibility: anchors-visible;
-    left: anchor(center);
-    top: calc(anchor(center) - 44px);
-    transform: translate(-50%, -50%);
+@supports (position-anchor: --packpier-sign-slot) {
+  /* Reserve a row in the native stack so optional controls such as Update keep their hit targets. */
+  nav[data-app-navigation-rail] > :last-child > :only-child:has(button[aria-haspopup="menu"])::before {
+    content: "";
+    display: block;
+    flex: none;
     width: 36px;
     height: 36px;
+    anchor-name: --packpier-sign-slot;
+  }
+  :root:has(nav[data-app-navigation-rail] > :last-child > :only-child button[aria-haspopup="menu"]) .packpier-p-sign {
+    display: grid;
+    position: fixed;
+    position-anchor: --packpier-sign-slot;
+    position-visibility: anchors-visible;
+    inset: anchor(top) anchor(right) anchor(bottom) anchor(left);
     place-items: center;
     border-radius: 8px;
     pointer-events: auto;
@@ -27,9 +25,6 @@ nav[data-app-navigation-rail] > :last-child > :only-child > :last-child {
     background: transparent;
     /* The native sidebar uses layer 40. Keep the mark visible above it. */
     z-index: 41;
-  }
-  :root:has(nav[data-app-navigation-rail] > :last-child > :only-child > :first-child > button[aria-haspopup="menu"]) .packpier-p-sign {
-    top: calc(anchor(--packpier-usage center) + anchor(--packpier-usage center) - anchor(--packpier-profile center));
   }
   .packpier-p-sign::before {
     content: "";
