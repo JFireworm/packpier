@@ -2,11 +2,11 @@ import AppKit
 
 @main enum SwiftUnit {
     @MainActor static func main() async throws {
+        try await CodexRestartCheck.run()
         try MarketApplicationsCheck.run()
         try WeChatOverlayCheck.run()
         try NativeUI.checkTime()
         try checkConnectionDiagnostics()
-        try await CodexRestartCheck.run()
     }
 
     @MainActor static func checkConnectionDiagnostics() throws {

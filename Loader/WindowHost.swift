@@ -15,13 +15,11 @@ final class WindowHost {
     private final class Session {
         let targetID: String
         let page: CDPPage
-        var mounted: [String] = []
-        var errors: [String: String] = [:]
-        var injected = false
-        var bindingAdded = false
+        let injection: WindowInjection
         init(targetID: String, page: CDPPage) {
             self.targetID = targetID
             self.page = page
+            injection = WindowInjection(page: page)
         }
     }
 
@@ -39,6 +37,8 @@ final class WindowHost {
     private let bundleVersion = "packpier-window-5"
     private var polling: Task<Void, Never>?
     private var stopped = false
+    private var failures: [String: String] = [:]
+    private var retryRequested = false
     private var serviceErrors: [String: String] = [:]
 
     var status: Report {
@@ -73,15 +73,18 @@ final class WindowHost {
 
     func sync(enabled: Bool, packages: [[String: Any]]) {
         lock.lock()
-        let changed = enabled != self.enabled || !Self.samePackages(packages, self.packages)
+        if enabled != self.enabled || !Self.samePackages(packages, self.packages) {
+            retryRequested = true
+        }
         self.enabled = enabled
         self.packages = packages
-        if !enabled { report = Report(kind: "disabled") }
         lock.unlock()
-        if changed {
-            if enabled { startPolling() }
-            Task { await self.tick() }
-        }
+    }
+
+    func retry() {
+        lock.lock()
+        retryRequested = true
+        lock.unlock()
     }
 
     func shutdown() {
@@ -98,7 +101,7 @@ final class WindowHost {
         Task {
             for session in live {
                 do {
-                    _ = try await session.page.evaluate("globalThis.__PACKPIER__ && globalThis.__PACKPIER__.close()")
+                    try await session.injection.close()
                     self.log("shutdown closed \(session.targetID)")
                 } catch {
                     self.log("shutdown close failed \(session.targetID): \(error.localizedDescription)")
@@ -113,17 +116,14 @@ final class WindowHost {
 
     private func startPolling() {
         lock.lock()
-        guard polling == nil, !stopped else { lock.unlock(); return }
-        lock.unlock()
-        let task = Task { [weak self] in
+        defer { lock.unlock() }
+        guard polling == nil, !stopped else { return }
+        polling = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.tick()
                 try? await Task.sleep(for: .seconds(2))
             }
         }
-        lock.lock()
-        polling = task
-        lock.unlock()
     }
 
     private func log(_ message: String) {
@@ -141,15 +141,16 @@ final class WindowHost {
     }
 
     private func tick() async {
-        lock.lock()
-        let isEnabled = enabled
-        let planned = packages
-        let bundleCode = bundle
-        let isStopped = stopped
-        lock.unlock()
+        let (isEnabled, planned, bundleCode, isStopped, retry) = lock.withLock {
+            let changed = retryRequested
+            retryRequested = false
+            return (enabled, packages, bundle, stopped, changed)
+        }
         guard !isStopped else { return }
+        if retry { failures.removeAll() }
         guard isEnabled else {
             await closeSessions()
+            failures.removeAll()
             set(Report(kind: "disabled"))
             return
         }
@@ -157,115 +158,104 @@ final class WindowHost {
             set(Report(kind: "waitingForHost", message: "缺少窗口渲染包"))
             return
         }
-
-        reconcileServices(planned)
-
-        let scanned = await CodexTargets.list()
-        log("tick targets=\(scanned?.count ?? -1)")
-        guard let targets = scanned else {
-            await closeSessions()
-            set(Report(kind: "waitingForCDP", message: "Codex 未开启本机连接端口"))
+        guard !LoaderConflict.running() else {
+            // Stand down without touching a page the other host may be using.
+            for session in takeSessions() { session.page.close() }
+            set(Report(kind: "loaderConflict", message: "另一个加载器正在运行"))
             return
         }
-        guard CodexListener.owner() != nil else {
+
+        reconcileServices(planned)
+        guard CodexListener.owner() != nil, let targets = await CodexTargets.list() else {
             await closeSessions()
+            failures.removeAll()
             set(Report(kind: "waitingForCDP", message: "未检测到可用的 Codex 本机连接"))
             return
         }
 
         let liveIDs = Set(targets.map(\.id))
-        for (id, session) in sessions where !liveIDs.contains(id) {
-            session.page.close()
-            sessions.removeValue(forKey: id)
+        failures = failures.filter { liveIDs.contains($0.key) }
+        let (remaining, removed) = lock.withLock {
+            let removed = sessions.filter { !liveIDs.contains($0.key) || $0.value.page.isClosed }
+            for id in removed.keys { sessions.removeValue(forKey: id) }
+            return (sessions, removed)
         }
+        var active = remaining
+        for session in removed.values { session.page.close() }
 
-        for target in targets where sessions[target.id] == nil {
-            let page = CDPPage(targetID: target.id, url: target.ws)
-            let session = Session(targetID: target.id, page: page)
-            page.onBinding = { request in
-                Task { await self.handle(request, from: session) }
-            }
-            page.onClose = { [weak self] in
-                guard let self else { return }
-                self.lock.lock()
-                if self.sessions[target.id]?.page === page { self.sessions.removeValue(forKey: target.id) }
-                self.lock.unlock()
+        let packageIDs = planned.compactMap { jsonString($0["id"]) }
+        for target in targets where failures[target.id] == nil {
+            guard mayInject() else { return }
+            let session: Session
+            if let current = active[target.id] {
+                session = current
+            } else {
+                let page = CDPPage(targetID: target.id, url: target.ws)
+                session = Session(targetID: target.id, page: page)
+                page.onBinding = { [weak self, weak session] request in
+                    guard let self, let session else { return }
+                    Task { await self.handle(request, from: session) }
+                }
+                do {
+                    try await page.open()
+                    let keep = lock.withLock {
+                        guard !stopped && enabled else { return false }
+                        sessions[target.id] = session
+                        return true
+                    }
+                    guard keep else { page.close(); return }
+                    active[target.id] = session
+                    log("page open \(target.id)")
+                } catch {
+                    let detail = "open: " + error.localizedDescription
+                    log("inject failed \(target.id) \(detail)")
+                    failures[target.id] = detail
+                    page.close()
+                    continue
+                }
             }
             do {
-                try await page.open()
-                sessions[target.id] = session
-                log("page open \(target.id)")
+                try await session.injection.apply(bundle: bundleCode, version: bundleVersion, packages: packageIDs) {
+                    self.log("\(target.id) " + $0)
+                }
+            } catch is CancellationError {
+                return
             } catch {
-                log("page open failed \(target.id): \(error.localizedDescription)")
-                page.close()
+                failures[target.id] = error.localizedDescription
             }
         }
-
-        guard !sessions.isEmpty else {
-            set(Report(kind: "waitingForPage", message: "等待 Codex 页面"))
-            return
-        }
-
-        for session in sessions.values {
-            await inject(session, bundle: bundleCode, planned: planned)
-        }
-        publish(planned: planned)
+        guard mayInject() else { return }
+        publish(planned: packageIDs, active: active)
     }
 
-    private func inject(_ session: Session, bundle: String, planned: [[String: Any]]) async {
-        do {
-            if !session.bindingAdded {
-                _ = try? await session.page.send("Runtime.addBinding", ["name": "__packpierRpc"])
-                session.bindingAdded = true
-            }
-            let current = try? await session.page.evaluate("globalThis.__PACKPIER__?.version ?? null")
-            if session.injected, let version = current as? String, version == bundleVersion { return }
-            session.injected = false
-
-            let state: JSONObject = [
-                "enabled": true,
-                "packages": planned.map { ["id": jsonString($0["id"]) ?? ""] },
-                "disabledPackageIDs": [],
-            ]
-            let expression = """
-            (() => {
-              const state = \(jsValue(state));
-              if (globalThis.__PACKPIER__ && globalThis.__PACKPIER__.version === \(jsValue(bundleVersion))) {
-                return globalThis.__PACKPIER__.apply(state);
-              }
-              \(bundle)
-              return globalThis.__PACKPIER__.apply(state);
-            })()
-            """
-            let value = try await session.page.evaluate(expression)
-            let result = value as? JSONObject
-            session.mounted = jsonStringList(result?["mounted"]) ?? []
-            session.errors = (result?["errors"] as? [String: String]) ?? [:]
-            session.injected = true
-        } catch {
-            log("inject failed: \(error.localizedDescription)")
-            session.injected = false
-        }
+    private func mayInject() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return !stopped && enabled && !Task.isCancelled
     }
 
-    private func publish(planned: [[String: Any]]) {
-        var mounted: [String] = []
+    private func takeSessions() -> [Session] {
+        lock.lock()
+        defer { lock.unlock() }
+        let live = Array(sessions.values)
+        sessions.removeAll()
+        return live
+    }
+
+    private func publish(planned: [String], active: [String: Session]) {
+        var mounted: Set<String> = []
         var windows: [String: [String]] = [:]
-        var errors: [String: String] = [:]
-        for session in sessions.values {
-            windows[session.targetID] = session.mounted
-            for id in session.mounted where !mounted.contains(id) { mounted.append(id) }
-            for (id, message) in session.errors where errors[id] == nil { errors[id] = message }
+        var errors = serviceErrors
+        for session in active.values where session.injection.connected && !session.page.isClosed {
+            let injection = session.injection
+            windows[session.targetID] = injection.mounted
+            mounted.formUnion(injection.mounted)
+            for (id, message) in injection.errors where errors[id] == nil { errors[id] = message }
         }
-        for (id, message) in serviceErrors where errors[id] == nil { errors[id] = message }
-        let order = planned.compactMap { jsonString($0["id"]) }
-        let ordered = order.filter { mounted.contains($0) }
-        let connected = sessions.values.contains { $0.injected }
-        set(Report(kind: connected ? "connected" : "waitingForPage",
-                   message: connected ? "" : "等待 Codex 页面",
-                   mounted: connected ? ordered : [],
-                   errors: connected ? errors : [:],
-                   windows: connected ? windows : [:]))
+        let detail = failures.keys.sorted().compactMap { failures[$0] }.first
+        let kind = detail != nil ? "error" : (windows.isEmpty ? "waitingForPage" : "connected")
+        set(Report(kind: kind, message: detail ?? (windows.isEmpty ? "等待 Codex 页面" : ""),
+                   mounted: planned.filter { mounted.contains($0) }, errors: errors, windows: windows))
     }
 
     private func reconcileServices(_ planned: [[String: Any]]) {
@@ -366,16 +356,15 @@ final class WindowHost {
     }
 
     private func broadcastEvent(_ plugin: String, _ name: String, _ payload: Any) async {
-        for session in sessions.values {
+        let active = lock.withLock { Array(sessions.values) }
+        for session in active {
             try? await session.page.evaluate("globalThis.__packpierEvent && globalThis.__packpierEvent(\(jsValue(plugin)), \(jsValue(name)), \(jsValue(payload)))")
         }
     }
 
     private func closeSessions() async {
-        let live = Array(sessions.values)
-        sessions.removeAll()
-        for session in live {
-            try? await session.page.evaluate("globalThis.__PACKPIER__ && globalThis.__PACKPIER__.close()")
+        for session in takeSessions() {
+            try? await session.injection.close()
             session.page.close()
         }
     }
@@ -384,6 +373,7 @@ final class WindowHost {
         lock.lock()
         let changed = next.kind != report.kind || next.mounted != report.mounted
             || next.errors != report.errors || next.windows != report.windows || next.message != report.message
+        guard !stopped else { lock.unlock(); return }
         report = next
         let callback = onChange
         lock.unlock()

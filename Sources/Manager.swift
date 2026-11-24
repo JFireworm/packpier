@@ -6,13 +6,17 @@ import UniformTypeIdentifiers
     @Published var state = HostState()
     @Published var connection = "正在连接加载器"
     @Published private(set) var restartMessage: String?
+    @Published private(set) var restartStartedAt: TimeInterval?
     @Published private var restartTask: Task<Void, Never>?
     var isRestartingCodex: Bool { restartTask != nil }
     var canRestartCodex: Bool {
         target == .codex && state.ready && state.enabled && !state.connected && !externalLoaderRunning &&
-            !isRestartingCodex && connection == CodexListener.Status.missing.rawValue
+            !loaderConflict && state.status != "error" && !isRestartingCodex &&
+            (restartMessage != nil || connection == CodexListener.Status.missing.rawValue)
     }
     @Published private(set) var externalLoaderRunning = false
+    @Published private var waitingForOtherLoader = false
+    var loaderConflict: Bool { waitingForOtherLoader || state.status == "loaderConflict" }
     @Published private var releaseWatchdog: Task<Void, Never>?
     var switchingLoader: Bool { releaseWatchdog != nil }
     @Published var error: String?
@@ -36,8 +40,8 @@ import UniformTypeIdentifiers
     #if PACKPIER_INDEPENDENT
     private let codexStartup = CodexStartup()
     private func observeCodexStartup() {
-        guard !terminating, state.ready, state.enabled,
-              target == .codex else {
+        guard !terminating, !isRestartingCodex, state.ready, state.enabled,
+              target == .codex, state.status != "loaderConflict" else {
             codexStartup.stop()
             return
         }
@@ -119,7 +123,19 @@ import UniformTypeIdentifiers
         } else {
             releaseWatchdog?.cancel()
             releaseWatchdog = nil
-            if loader == nil { openLoader() }
+            if loader == nil {
+                #if PACKPIER_INDEPENDENT
+                let conflict = LoaderConflict.running()
+                if conflict {
+                    if !waitingForOtherLoader { record("另一个加载器正在运行") }
+                    connection = "另一个加载器正在运行"
+                    waitingForOtherLoader = true
+                    return
+                }
+                waitingForOtherLoader = false
+                #endif
+                openLoader()
+            }
         }
     }
     func reconnectFromMarketplace() {
@@ -144,15 +160,39 @@ import UniformTypeIdentifiers
     func restartCodex() {
         guard canRestartCodex, !terminating else { return }
         let ticket = generation
+        #if PACKPIER_INDEPENDENT
+        codexStartup.pauseForRestart()
+        #endif
+        restartStartedAt = ProcessInfo.processInfo.systemUptime
+        restartMessage = "正在等待 Codex 退出…"
         restartTask = Task {
-            defer { if generation == ticket { restartTask = nil } }
+            defer {
+                if generation == ticket {
+                    restartTask = nil
+                    restartStartedAt = nil
+                    #if PACKPIER_INDEPENDENT
+                    codexStartup.resumeAfterRestart()
+                    observeCodexStartup()
+                    #endif
+                }
+            }
             do {
                 try await CodexStartup.restart { message in
                     restartMessage = message
                     record("Codex: " + message)
                 }
-                try Task.checkCancellation()
-                // A verified page is available. The loader owns the subsequent mount status.
+                let deadline = ProcessInfo.processInfo.systemUptime + 50
+                while !state.connected {
+                    try Task.checkCancellation()
+                    if state.status == "error" || state.status == "loaderConflict" {
+                        let detail = (state.raw["status"] as? Fields)?["message"] as? String ?? connection
+                        throw PackpierError.message(detail)
+                    }
+                    guard ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw PackpierError.message("Codex 已重新打开，窗口仍未连接。")
+                    }
+                    try await Task.sleep(for: .milliseconds(250))
+                }
                 restartMessage = nil
             } catch is CancellationError {
                 return
@@ -231,8 +271,10 @@ import UniformTypeIdentifiers
         restartTask?.cancel()
         restartTask = nil
         restartMessage = nil
+        restartStartedAt = nil
         record("Loader stopped · status=\(loader?.process.terminationStatus ?? -1)")
         #if PACKPIER_INDEPENDENT
+        codexStartup.resumeAfterRestart()
         codexStartup.stop()
         #endif
         loader = nil
@@ -247,7 +289,7 @@ import UniformTypeIdentifiers
         initializing = nil
         if terminating { onStopped?(); return }
         if !official.isEmpty { externalLoaderRunning = true; connection = "另一个加载器正在使用 Codex" }
-        else if blockedByExternalLoader { reconcile() }
+        else if blockedByExternalLoader || LoaderConflict.running() { reconcile() }
         else { connection = "加载器已退出，可重新连接" }
     }
     func finish(_ callback: @escaping () -> Void) {
@@ -307,7 +349,7 @@ import UniformTypeIdentifiers
     }
     private func update(_ raw: Fields) {
         state = HostState(raw:raw)
-        if state.connected || !state.enabled { restartMessage = nil }
+        if !isRestartingCodex && (state.connected || !state.enabled) { restartMessage = nil }
         let detail = (raw["status"] as? Fields)?["message"] as? String ?? ""
         let hostReport = "Loader responded · window=\(state.status) \(detail)"
         if hostReport != lastHostReport {
@@ -327,7 +369,8 @@ import UniformTypeIdentifiers
         }
         let texts = ["waitingForHost":"等待 Codex 窗口接入","connected":"加载器已连接","waitingForCDP":"等待 Codex 连接","waitingForPage":"等待 Codex 页面",
                      "starting":"正在连接 Codex","disabled":"加载器已暂停","codexNotRunning":"Codex 未运行",
-                     "restartRequired":"当前 Codex 未开启插件连接端口，需要重启 Codex。","launchingCodex":"正在连接 Codex","error":"加载器异常",
+                     "restartRequired":"当前 Codex 未开启插件连接端口，需要重启 Codex。","launchingCodex":"正在连接 Codex","error":"接管窗口失败",
+                     "loaderConflict":"另一个加载器正在运行",
                      "nodeMissing":"内置运行环境缺失，请重新安装 Packpier。"]
         connection = texts[state.status] ?? "等待加载器状态"
         #if PACKPIER_INDEPENDENT

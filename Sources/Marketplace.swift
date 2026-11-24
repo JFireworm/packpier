@@ -132,26 +132,47 @@ struct MarketplacePage: View {
         guard let p = item.installed else { return target == .codex && !m.state.ready ? .waiting : .absent }
         return .current(p,state:m.state,mounted:Set((m.state.raw["windowEffects"] as? Fields)?["mounted"] as? [String] ?? []))
     }
+    private var connectionLabel: String {
+        if confirmingRestart && m.canRestartCodex {
+            return "Codex 将退出并重新打开。请先保存窗口中未提交的内容。"
+        }
+        if !m.isRestartingCodex && (m.state.status == "error" || m.loaderConflict) { return m.connection }
+        return m.restartMessage ?? m.connection
+    }
     var body: some View {
         let catalog = market?.packages(for:target) ?? []
         let all = MarketItem.list(catalog:catalog,installed:installed)
         let rows = all.filter { m.search.isEmpty || ($0.title(code) + " " + $0.id).localizedCaseInsensitiveContains(m.search) }
         let selected = rows.first { $0.id == m.selectedPackageID } ?? rows.first
         VStack(alignment:.leading,spacing:12) {
-            if target == .codex && !m.state.connected {
+            if target == .codex && (!m.state.connected || m.isRestartingCodex) {
                 HStack(spacing:8) {
-                    Text(LocalizedStringKey(confirmingRestart ? "Codex 将退出并重新打开。请先保存窗口中未提交的内容。" : (m.restartMessage ?? m.connection)))
+                    if let started = m.restartStartedAt {
+                        ProgressView().controlSize(.small)
+                        TimelineView(.periodic(from: .now, by: 1)) { _ in
+                            Text(Duration.seconds(max(0, Int(ProcessInfo.processInfo.systemUptime - started))),
+                                 format: .units(allowed: [.seconds], width: .abbreviated))
+                                .monospacedDigit().foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(LocalizedStringKey(connectionLabel))
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal:false, vertical:true)
-                    if confirmingRestart && m.canRestartCodex {
+                    if m.isRestartingCodex {
+                        Button("重启并连接") {}.buttonStyle(.link).disabled(true)
+                    } else if confirmingRestart && m.canRestartCodex {
                         Button("确认重启") { confirmingRestart = false; m.restartCodex() }.buttonStyle(.link)
                         Button("取消") { confirmingRestart = false }.buttonStyle(.link)
                     } else if m.canRestartCodex {
-                        Button("重启并连接") { confirmingRestart = true }
+                        Button(m.restartMessage == nil ? "重启并连接" : "重试") { confirmingRestart = true }
                             .help("Codex 将退出并重新打开。请先保存窗口中未提交的内容。")
                             .accessibilityHint("Codex 将退出并重新打开。请先保存窗口中未提交的内容。")
                             .buttonStyle(.link).accessibilityIdentifier("market.restartCodex")
                     }
                     if !confirmingRestart { Button("连接详情", action:showConnection).buttonStyle(.link) }
+                    if m.state.status == "error" {
+                        Button("重试") { m.send("retryWindowHost") }.buttonStyle(.link)
+                            .disabled(m.isRestartingCodex)
+                    }
                     if !m.state.ready {
                         Button(LocalizedStringKey(m.externalLoaderRunning ? "切换到 Packpier" : "重新连接")) {
                             m.reconnectFromMarketplace()
@@ -162,6 +183,14 @@ struct MarketplacePage: View {
 
                     }
                 }.font(.callout)
+                if m.loaderConflict {
+                    Text(m.state.ready ? "请退出其他 Packpier 或旧加载器，当前窗口会自动重试。" :
+                        "请退出其他 Packpier 或旧加载器，然后点「重新连接」。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if m.state.status == "error", let detail = (m.state.raw["status"] as? Fields)?["message"] as? String {
+                    Text(verbatim: detail).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                }
             }
             if case let .failure(error) = Marketplace.bundled { Text(PPText.get(error.localizedDescription)).foregroundStyle(.secondary) }
             HStack(alignment:.top,spacing:14) {

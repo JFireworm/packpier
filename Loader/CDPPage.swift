@@ -14,7 +14,6 @@ final class CDPPage {
     private var closing = false
 
     var onBinding: ((JSONObject) -> Void)?
-    var onClose: (() -> Void)?
     private(set) var confirmed = false
 
     init(targetID: String, url: URL) {
@@ -22,7 +21,6 @@ final class CDPPage {
         self.url = url
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 8
-        config.timeoutIntervalForResource = 30
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.connectionProxyDictionary = [:]
         config.httpShouldSetCookies = false
@@ -33,16 +31,15 @@ final class CDPPage {
 
     func open() async throws {
         let task = session.webSocketTask(with: url)
-        lock.lock()
-        socket = task
-        lock.unlock()
+        lock.withLock { socket = task }
         task.resume()
         receive()
         _ = try await send("Runtime.enable", [:], timeout: 6)
-        lock.lock()
-        confirmed = !closed
-        lock.unlock()
-        guard confirmed else { throw WireError.message("Codex page closed during handshake") }
+        let open = lock.withLock {
+            confirmed = !closed
+            return confirmed
+        }
+        guard open else { throw WireError.message("Codex page closed during handshake") }
     }
 
     func evaluate(_ expression: String, timeout: TimeInterval = 20) async throws -> Any? {
@@ -50,7 +47,8 @@ final class CDPPage {
                                    ["expression": expression, "returnByValue": true, "awaitPromise": true],
                                    timeout: timeout)
         if let exception = reply["exceptionDetails"] as? JSONObject {
-            let text = jsonString(exception["text"]) ?? "JavaScript exception"
+            let text = jsonString(jsonObject(exception["exception"])?["description"])
+                ?? jsonString(exception["text"]) ?? "JavaScript exception"
             throw WireError.message(text)
         }
         return jsonObject(reply["result"])?["value"]
@@ -119,6 +117,13 @@ final class CDPPage {
         guard let data = text.data(using: .utf8),
               let message = try? JSONSerialization.jsonObject(with: data) as? JSONObject else { return }
         if let id = jsonInt(message["id"]) {
+            if let error = jsonObject(message["error"]) {
+                let code = jsonInt(error["code"]).map(String.init) ?? "unknown"
+                let detail = jsonString(error["message"]) ?? "Unknown error"
+                let data = jsonString(error["data"]).map { ": " + $0 } ?? ""
+                resolve(id, .failure(WireError.message("CDP \(code): \(detail)\(data)")))
+                return
+            }
             resolve(id, .success(jsonObject(message["result"]) ?? [:]))
             return
         }
@@ -154,7 +159,6 @@ final class CDPPage {
         pending.removeAll()
         lock.unlock()
         for completion in waiting.values { completion(.failure(error)) }
-        onClose?()
     }
 
     var isClosed: Bool {

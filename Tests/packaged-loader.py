@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import time
 
-app = Path(__file__).resolve().parents[1] / "build/Packpier.app/Contents"
+app = Path(__file__).resolve().parents[1] / "build" / os.environ.get("PACKPIER_ARCH", "") / "Packpier.app/Contents"
 helper = app / "Helpers/packpier-codex-loader"
 
 
@@ -59,7 +59,7 @@ def check_processes(parent):
         pending.extend(children.get(pid, ()))
 
 
-def run_case(tmp, enabled):
+def run_case(tmp, enabled, existing_conflict, blocker=None):
     store = Path(tmp) / "library"
     packages = store / "packages"
     order = ["p-sign", "prism", "third-party-fixture", "custom-background"]
@@ -94,7 +94,8 @@ def run_case(tmp, enabled):
             if enabled:
                 plan = reply_to(child, pending, {"id": 101, "method": "getWindowPlan"})
                 assert [p["id"] for p in plan["packages"]] == ["p-sign", "prism", "custom-background"]
-            expected = "waitingForCDP" if enabled else "disabled"
+            idle_status = "loaderConflict" if existing_conflict else "waitingForCDP"
+            expected = "loaderConflict" if blocker else (idle_status if enabled else "disabled")
             for request_id in range(2, 27):
                 check_processes(child.pid)
                 state = reply_to(child, pending, {"id": request_id, "method": "getState"})
@@ -103,6 +104,11 @@ def run_case(tmp, enabled):
                 time.sleep(0.2)
             assert state["status"]["kind"] == expected, state["status"]
             assert not state["windowEffects"]["mounted"] and not state["windowEffects"]["windows"]
+            if blocker:
+                assert state["status"]["message"] == "另一个加载器正在运行"
+                blocker.terminate()
+                blocker.wait(timeout=5)
+                expected = idle_status
             # Observe a second polling interval as well as initialization.
             for _ in range(6):
                 time.sleep(0.4)
@@ -123,6 +129,30 @@ def run_case(tmp, enabled):
 
 
 check_bundle()
+processes = subprocess.check_output(["/bin/ps", "-axww", "-o", "uid=,command="], text=True)
+existing_conflict = any(
+    "window-host.mjs" in command or
+    any(command.endswith(suffix) or suffix + " " in command for suffix in (
+        "/Contents/MacOS/Packpier", "/packpier-codex-loader", "/codex-tweaks-backend")) or
+    ("/Packpier" in command and "/Contents/Helpers/node" in command)
+    for uid, command in (line.split(maxsplit=1) for line in processes.splitlines() if line.strip())
+    if int(uid) == os.getuid() and command.startswith("/")
+    and not Path(command.split()[0]).name in {"bash", "zsh", "sh"}
+)
 for enabled in (False, True):
     with tempfile.TemporaryDirectory(prefix="packpier-packaged-") as tmp:
-        run_case(tmp, enabled)
+        run_case(tmp, enabled, existing_conflict)
+with tempfile.TemporaryDirectory(prefix="packpier-conflict-") as tmp:
+    fixture = Path(tmp) / "packpier-codex-loader"
+    shutil.copy("/bin/sleep", fixture)
+    with subprocess.Popen([fixture, "30"]) as blocker:
+        try:
+            run_case(tmp, True, existing_conflict, blocker)
+        finally:
+            if blocker.poll() is None:
+                blocker.terminate()
+                blocker.wait(timeout=5)
+    if existing_conflict:
+        print("PASS competing loader reported while another Packpier process remained active")
+    else:
+        print("PASS competing loader reported and normal discovery resumed after it exited")

@@ -1,6 +1,6 @@
 // Runs in a fresh browser profile against the built renderer and a synthetic Codex document.
-import "../build/Renderer/window-effects.iife.js";
-import { createWindowEffects } from "../build/Renderer/window-effects.mjs";
+import "packpier-test-host";
+import { createWindowEffects } from "packpier-test-effects";
 
 function check(value, detail) {
   if (!value) throw Error(detail);
@@ -10,6 +10,12 @@ async function run() {
   document.body.innerHTML = `<nav data-app-navigation-rail><div><div><div><button aria-haspopup="menu">Usage</button></div><div>Profile</div></div></div></nav>
     <aside data-sidebar-navigation-root><section data-app-action-sidebar-section data-app-action-sidebar-section-heading="Recents">
       <div data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="sample" data-app-action-sidebar-thread-kind="local">Sample chat</div>
+    </section><section data-app-action-sidebar-section data-app-action-sidebar-section-heading="Pinned">
+      <h2>Pinned</h2><div data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="pin-one" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="true">First pin</div>
+      <div data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="pin-two" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="true">Second pin</div>
+    </section><section id="flying" data-app-action-sidebar-section data-app-action-sidebar-section-heading="Flying">
+      <div id="flying-chat" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:01a202f7" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="false">Flying chat</div>
+      <div id="flying-project" data-app-action-sidebar-project-row data-app-action-sidebar-project-id="codex:project:d0b14761">Flying project</div>
     </section></aside><main></main>`;
   const storageKey = "codex-tweaks:codex-custom-background:v1";
   const pixel = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
@@ -18,13 +24,26 @@ async function run() {
     kind: "alcy", finalUrl: "https://t.alcy.cc/pic/pc/first.webp", favorites: [favorite],
   }));
   let requests = 0;
+  const flyingThreadKey = "codex:thread:local:01a202f7";
+  const flyingProjectKey = "project:d0b14761";
+  const preferences = { mode: "all", colors: { "codex:thread:local:sample": "#FF79A9",
+    [flyingThreadKey]: "#408A70", [flyingProjectKey]: "#118ACC" }, order: [], recentColors: [],
+    presetColors: Array.from({ length: 16 }, (_, i) => "#" + (0x559900 + i).toString(16)) };
+  const edits = [];
   const effects = createWindowEffects({
     prismService: {
       on: () => () => {},
-      invoke: async () => ({
-        account: "test", projects: [], threads: [], language: "en",
-        preferences: { mode: "all", colors: { "codex:thread:local:sample": "#FF79A9" }, order: [] },
-      }),
+      invoke: async (method, { operation } = {}) => {
+        if (method === "update") {
+          edits.push(operation);
+          preferences.colors[operation.key] = operation.value;
+        }
+        return { account: "test", projects: [], language: "en", preferences,
+          threads: [{ id: "pin-one", nativeIndex: 1 }, { id: "pin-two", nativeIndex: 2 }],
+          threadProjects: { [flyingThreadKey]: "d0b14761" },
+          customSections: [{ id: "flying", name: "Flying", threadKeys: [flyingThreadKey],
+            projectKeys: ["codex:project:d0b14761"] }] };
+      },
     },
     backgroundService: {
       invoke: async method => {
@@ -52,6 +71,34 @@ async function run() {
   await new Promise(resolve => setTimeout(resolve, 100));
   const row = document.querySelector("[data-app-action-sidebar-thread-row]");
   check(row.style.getPropertyValue("--prism-native-color") === "#FF79A9", "Missing native row color");
+  const flying = document.querySelector("#flying");
+  const flyingChat = document.querySelector("#flying-chat");
+  const flyingProject = document.querySelector("#flying-project");
+  const tint = target => target.style.getPropertyValue("--prism-native-color");
+  const pins = () => [...document.querySelectorAll("[data-prism-native-rank]")].map(pin => pin.getAttribute("data-prism-native-rank")).join(",");
+  const pinOrder = pins();
+  check(pinOrder === "01,02" && document.querySelector(".prism-tools"), "Pinned rank or toolbar missing");
+  check(tint(flyingChat) === "#408A70" && tint(flyingProject) === "#118ACC", "Flying colors missing");
+  check(!flyingChat.hasAttribute("data-prism-native-rank"), "Custom row entered Pinned ranking");
+  for (const [target, key] of [[flyingChat, flyingThreadKey], [flyingProject, flyingProjectKey]]) {
+    target.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    const palette = document.querySelector(".prism-dot:not([hidden])");
+    check(palette, "No palette on " + key);
+    palette.click();
+    const firstSwatch = document.querySelector(".prism-swatches button[data-color]");
+    check(firstSwatch, "No swatches on " + key);
+    firstSwatch.click();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    check(edits.at(-1)?.key === key && tint(target) === edits.at(-1)?.value, "Color edit not applied to " + key);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  }
+  flying.setAttribute("data-app-action-sidebar-section-collapsed", "true");
+  window.__prismNativeSidebarV1.refreshNow();
+  check(!tint(flyingChat) && !tint(flyingProject) && pins() === pinOrder, "Collapsed Flying affected Pinned");
+  flying.removeAttribute("data-app-action-sidebar-section-collapsed");
+  window.__prismNativeSidebarV1.refreshNow();
+  check(tint(flyingChat) === preferences.colors[flyingThreadKey] &&
+    tint(flyingProject) === preferences.colors[flyingProjectKey] && pins() === pinOrder, "Flying did not restore after reopening");
   const wallpaper = document.querySelector("[data-packpier-cbgp-wallpaper]");
   check(!wallpaper.hidden && wallpaper.style.cssText.includes("first.webp"), "Missing wallpaper");
   const sign = document.querySelector(".packpier-p-sign");

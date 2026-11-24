@@ -30,7 +30,7 @@ import SQLite3
         try database(catalog, sql: """
             CREATE TABLE local_thread_catalog(thread_id,host_id,display_title,cwd,project_id);
             INSERT INTO local_thread_catalog VALUES ('one','local','First','/a','native-a');
-            INSERT INTO local_thread_catalog VALUES ('unpinned','local','Extra','/b',NULL);
+            INSERT INTO local_thread_catalog VALUES ('01a202f7','local','Flying chat','/b','d0b14761');
             """)
         try database(legacy, sql: """
             CREATE TABLE threads(id,name,cwd,archived);
@@ -42,6 +42,11 @@ import SQLite3
         let stateFile = root.appendingPathComponent(".codex-global-state.json")
         var global: JSONObject = ["electron-owner-atoms:account_1": atoms, "electron-owner-atoms:other": atoms,
                                   "electron-renderer-content-owner": "account_1",
+                                  "sidebar-custom-sections-v3": [
+                                    "account_1": [["id": "flying", "name": "Flying",
+                                                   "itemKeys": ["codex:thread:local:01a202f7", "codex:project:d0b14761"]]],
+                                    "other": [["id": "private", "name": "Other account", "itemKeys": ["codex:project:missing"]]],
+                                  ],
                                   "local-projects": ["a": ["rootPaths": ["/a"]], "b": ["rootPaths": ["/b"]]],
                                   "app-server-project-id-by-legacy-project-id-by-host": ["local": ["a": "native-a"]]]
         try writeJSONObject(global, to: stateFile)
@@ -59,9 +64,23 @@ import SQLite3
         prefs["groups"] = [["id": "existing", "name": "Group"]]
         prefs["futureField"] = "keep"
         try writeJSONObject(prefs, to: preferences)
+        let sections = snap["customSections"] as? [JSONObject] ?? []
+        let threadKey = "codex:thread:local:01a202f7"
+        try check(sections.count == 1 && sections.first?["name"] as? String == "Flying" &&
+                  sections.first?["threadKeys"] as? [String] == [threadKey] &&
+                  sections.first?["projectKeys"] as? [String] == ["codex:project:d0b14761"], "Wrong account's custom sections")
+        let custom = (snap["customThreads"] as? [JSONObject])?.first
+        try check(custom?["title"] as? String == "Flying chat" && custom?["projectId"] as? String == "d0b14761",
+                  "Missing unpinned thread metadata")
+        _ = try await service.update(account: "account_1", operation: ["type": "color",
+            "key": "project:d0b14761", "value": "#118ACC"])
         let edited = try await service.update(account: "account_1", operation: ["type": "color",
-            "key": "codex:thread:local:unpinned", "source": "project", "value": NSNull()])
-        try check((edited["threadProjects"] as? JSONObject)?["codex:thread:local:unpinned"] as? String == "b", "Unpinned inheritance lost")
+            "key": threadKey, "source": "project", "value": NSNull()])
+        try check((edited["threadProjects"] as? JSONObject)?[threadKey] as? String == "d0b14761", "Unpinned inheritance lost")
+        _ = try await service.update(account: "account_1", operation: ["type": "color", "key": threadKey, "value": "#408A70"])
+        let reopened = try await PrismService(codexRoot: root, dataDirectory: data).snapshot()
+        let restored = (reopened["preferences"] as? JSONObject)?["colors"] as? [String: String]
+        try check(restored?[threadKey] == "#408A70" && restored?["project:d0b14761"] == "#118ACC", "Custom colors did not persist")
         async let first = service.update(account: "account_1", operation: ["type": "preset-color", "slot": 0, "value": "#abcdef"])
         async let second = service.update(account: "account_1", operation: ["type": "mode", "value": "project"])
         _ = try await (first, second)

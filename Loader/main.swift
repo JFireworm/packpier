@@ -83,6 +83,8 @@ func handle(_ message: Object) throws -> Object {
         return ["packages": enabled ? report.mounted.map { ["id": $0] } : [], "enabled": enabled]
     case "getWindowPlan":
         return try library.windowEffects()
+    case "retryWindowHost":
+        host.retry()
     case "getState", "reloadPackages": break
     case "authorizeNodePackage":
         guard let id = params["packageID"] as? String, let token = params["authorizationID"] as? String else {

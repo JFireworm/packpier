@@ -211,9 +211,8 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
   const threadAttribute = "data-app-action-sidebar-thread-id";
   const projectAttribute = "data-app-action-sidebar-project-id";
   const pinnedSection = '[data-app-action-sidebar-section][data-app-action-sidebar-section-heading="Pinned"]';
-  const projectSection = '[data-app-action-sidebar-section][data-app-action-sidebar-section-heading="Projects"]';
-  const recentSection = '[data-app-action-sidebar-section][data-app-action-sidebar-section-heading="Recents"]';
-  const localThreadRow = `[${rowAttribute}][${threadAttribute}][data-app-action-sidebar-thread-kind="local"]`;
+  const sidebarSection = "[data-app-action-sidebar-section]";
+  const threadRow = `[${rowAttribute}][${threadAttribute}]`;
   const selectedRows = /* @__PURE__ */ new Set();
   const selectedProjects = /* @__PURE__ */ new Set();
   const chatRows = /* @__PURE__ */ new Set();
@@ -272,15 +271,13 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
   function getSections() {
     const root = document.querySelector("[data-sidebar-navigation-root]");
     const pins = root?.querySelectorAll(pinnedSection);
-    const projects = root?.querySelectorAll(projectSection);
     return {
-      recent: root?.querySelector(recentSection),
       pins: pins?.length === 1 ? pins[0] : null,
-      projects: projects?.length === 1 ? projects[0] : null
+      sections: Array.from(root?.querySelectorAll(sidebarSection) ?? [])
     };
   }
   function paint2() {
-    const { pins, projects, recent } = getSections();
+    const { pins, sections } = getSections();
     const pinRows = uniqueRows(ownRows(pins, `[${rowAttribute}][${threadAttribute}][data-app-action-sidebar-thread-pinned="true"]`), threadAttribute);
     const desiredRows = mode === "smoke" ? pinRows.slice(0, 1) : pinRows;
     const layout = layoutRows?.(pinRows, pins);
@@ -306,9 +303,9 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
       row.style.setProperty("--prism-native-fraction", String(1 - (rank - 1) / Math.max(1, count - 1) * 0.45));
       selectedRows.add(row);
     }
-    const projectRows = mode === "smoke" ? [] : uniqueRows(
-      ownRows(projects, `[data-app-action-sidebar-project-row][${projectAttribute}]`),
-      projectAttribute
+    const expanded = sections.filter(section => section.getAttribute("data-app-action-sidebar-section-collapsed") !== "true");
+    const projectRows = mode === "smoke" ? [] : expanded.flatMap(
+      section => ownRows(section, `[data-app-action-sidebar-project-row][${projectAttribute}]`)
     );
     for (const row of selectedProjects) if (!projectRows.includes(row)) clearProject(row);
     for (const row of projectRows) {
@@ -319,11 +316,11 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
       setAccent(row, projectColor ? projectColor(row) : colors[preferenceKey]);
       selectedProjects.add(row);
     }
-    if (chatColor) {
-      const visible = new Set([
-        ...ownRows(projects, `[data-app-action-sidebar-project-list-id] ${localThreadRow}`),
-        ...ownRows(recent, localThreadRow)
-      ].filter((row) => (row.getAttribute("data-app-action-sidebar-thread-host-id") || "local") === "local"));
+    if (chatColor && mode !== "smoke") {
+      const visible = new Set(expanded.flatMap(section => ownRows(section, threadRow)).filter((row) => {
+        const thread = readThread(row);
+        return !selectedRows.has(row) && thread.id && thread.kind === "codex" && thread.hostId === "local";
+      }));
       for (const row of chatRows) if (!visible.has(row)) clearChat(row);
       for (const row of visible) {
         row.toggleAttribute("data-prism-chat", true);
@@ -370,6 +367,7 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
       min-height:1.55em; border-radius:4px; overflow:hidden;
       background-color:var(--prism-native-color); color:var(--prism-native-ink);
     }
+    :where([data-sidebar-navigation-root] [data-prism-native-project][data-prism-accent]) { position:relative }
     [data-sidebar-navigation-root] [data-prism-native-project][data-prism-accent]::before {
       content:""; position:absolute; inset-inline-start:0; inset-block:3px;
       width:3px; border-radius:2px; background:var(--prism-native-color); pointer-events:none;
@@ -384,7 +382,8 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: [sectionAttribute, threadAttribute, projectAttribute, "data-app-action-sidebar-thread-pinned", "data-app-action-sidebar-section-collapsed", "hidden"]
+    attributeFilter: [sectionAttribute, threadAttribute, projectAttribute, "data-app-action-sidebar-thread-kind",
+      "data-app-action-sidebar-thread-host-id", "data-app-action-sidebar-thread-pinned", "data-app-action-sidebar-section-collapsed", "hidden"]
   });
   function schedule() {
     if (frame !== null) return;
@@ -426,12 +425,14 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
 
 function readThread(row) {
   const attr = (name) => row.getAttribute("data-app-action-sidebar-thread-" + name);
-  const rawId = attr("id");
+  const rawId = attr("id") || "";
   const kind = attr("kind") || "local";
+  const hostId = attr("host-id") || "local";
+  const local = hostId === "local" && (kind === "local" || kind === "codex");
   return {
-    id: kind === "local" ? rawId.replace(/^local:/, "") : rawId,
+    id: local ? rawId.replace(/^(?:codex:thread:)?local:/, "") : rawId,
     kind: kind === "local" ? "codex" : kind,
-    hostId: attr("host-id") || "local"
+    hostId
   };
 }
 function projectId(row, state) {
