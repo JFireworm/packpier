@@ -93,3 +93,5 @@ Packpier uses Sparkle 2. Maintainers run `python3 Scripts/release.py` after buil
 ## License
 
 [MIT](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Plugin authoring Skill](Resources/Skills/packpier-plugin-author/SKILL.md)
+
+[Contributors](CONTRIBUTORS.md)
