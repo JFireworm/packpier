@@ -96,8 +96,8 @@
   background-color: transparent !important;
 }
 
-/* Codex raises its macOS backdrop on blur, covering the image in Stage Manager. */
-:root[data-packpier-cbgp-theme]:not([data-packpier-cbgp-transparent]) .macos-window-backdrop {
+/* Codex 失焦时会显示不透明的窗口底板，盖住透明背景和壁纸。 */
+:root[data-packpier-cbgp-theme] .macos-window-backdrop {
   opacity: 0 !important;
 }
 
@@ -225,6 +225,9 @@
   > [aria-hidden="true"],
 :root[data-packpier-cbgp-theme]
   [data-app-shell-main-surface="default"]
+  [aria-hidden="true"][class~="pointer-events-none"][class*="bg-[image:var(--app-shell-content-fade,"],
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-main-surface="default"]
   [class~="pointer-events-none"][class~="w-[anchor-size(width)]"][class*="_background_"],
 :root[data-packpier-cbgp-theme]
   [data-app-shell-main-surface="default"]
@@ -254,6 +257,16 @@
   [data-app-shell-main-surface="default"]
   [aria-hidden="true"][class~="pointer-events-none"][class~="from-surface"] {
   background-image: none !important;
+}
+
+/* 新版会话布局将底板与渐变绘制在输入区外层的两个伪元素上。 */
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-main-surface="default"] [data-app-action-timeline-scroll]
+  > [class~="absolute"][class~="pointer-events-none"]:has(> [data-thread-scroll-footer="true"])::before,
+:root[data-packpier-cbgp-theme]
+  [data-app-shell-main-surface="default"] [data-app-action-timeline-scroll]
+  > [class~="absolute"][class~="pointer-events-none"]:has(> [data-thread-scroll-footer="true"])::after {
+  background: none !important;
 }
 
 /* 控件磨砂与背景磨砂使用不同标记。这里只覆盖 Codex 的面板/柔和控件
