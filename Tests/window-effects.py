@@ -7,12 +7,17 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[1]
-renderer = root / "build/RendererSources"
+arch = os.environ.get("PACKPIER_ARCH", "")
+output = root / "build" / arch
+renderer = root / "build" / ("RendererSources-" + arch if arch else "RendererSources")
+contents = output / "Packpier.app/Contents"
 chrome = os.environ.get("CHROME_BIN", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 with TemporaryDirectory(prefix="packpier-effects-") as folder:
     page = Path(folder) / "check.html"
     subprocess.run([renderer / "node_modules/.bin/esbuild", root / "Tests/window-effects.js",
-                    "--bundle", "--outfile=" + str(page.with_suffix(".js"))], check=True)
+                    "--bundle", "--alias:packpier-test-host=" + str(contents / "Resources/WindowHost/window-effects.js"),
+                    "--alias:packpier-test-effects=" + str(output / "Renderer/window-effects.mjs"),
+                    "--outfile=" + str(page.with_suffix(".js"))], check=True)
     # Generate the browser input through the Swift loader using real builtin manifests.
     store = Path(folder) / "library"
     for name, source in [("p-sign", "Resources/BundledPlugins/p-sign"), ("prism", "Plugins/Prism"),
@@ -31,10 +36,11 @@ with TemporaryDirectory(prefix="packpier-effects-") as folder:
                 ("getWindowPlan", {}), ("setPackageEnabled", {"packageID": order[2], "enabled": False}),
                 ("getWindowPlan", {})]
     offline_loader = ["/usr/bin/sandbox-exec", "-p", "(version 1)(allow default)(deny network*)",
-                      root / "build/packpier-loader"]
+                      contents / "Helpers/packpier-codex-loader"]
     result = subprocess.run(offline_loader, input="".join(
         json.dumps({"id": i, "method": method, "params": params}) + "\n"
-        for i, (method, params) in enumerate(requests)), capture_output=True, text=True, check=True)
+        for i, (method, params) in enumerate(requests)), capture_output=True, text=True, check=True,
+        env={**os.environ, "CFFIXED_USER_HOME": folder})
     replies = [reply["result"] for reply in map(json.loads, result.stdout.splitlines()) if "id" in reply]
     state = replies[-1]
     expected = {"enabled": True, "packages": [{"id": name} for name in order if name != order[2]]}

@@ -30,7 +30,7 @@ The same conversation with two wallpapers. Select an image to open it at full si
 
 ## Install
 
-**Requirements:** macOS 14 or later. The 0.1.28 release is built for Apple Silicon (arm64).
+Packpier requires macOS 14 or later. Choose the DMG matching **About This Mac**. Apple M-series chips use the `macOS-arm64.dmg` asset. Intel Macs use the `macOS-x86_64.dmg` asset.
 
 1. Open [GitHub Releases](https://github.com/JFireworm/packpier/releases/latest) and download the DMG for your Mac.
 2. Open the DMG and **drag Packpier.app onto Applications in the same window**. Eject the disk image, then open Packpier from Applications.
@@ -38,7 +38,7 @@ The same conversation with two wallpapers. Select an image to open it at full si
 
 The current build is ad-hoc signed and **not notarized by Apple**. If macOS blocks the first launch, confirm the file came from this project's GitHub Releases, then open **System Settings → Privacy & Security** and choose **Open Anyway**.
 
-On first launch Packpier registers itself as a login item. If macOS asks for approval, open **Settings & Updates → Open Login Items Settings**. Automatic updates are on by default and can be changed on the same screen.
+On first launch Packpier registers itself as a login item. If macOS asks for approval, open **Settings & Updates → Open Login Items Settings**. Automatic updates are on by default on Apple Silicon and can be changed on the same screen. Intel users update by downloading the new x86_64 DMG from Releases.
 
 ## Connect to Codex
 
@@ -74,6 +74,15 @@ make check
 open build/Packpier.app
 ./Scripts/build-dmg.sh
 ```
+
+To cross-build the Intel edition on Apple Silicon after `make bootstrap`:
+
+```sh
+PACKPIER_ARCH=x86_64 ./Scripts/build.sh
+PACKPIER_ARCH=x86_64 ./Scripts/build-dmg.sh
+```
+
+The Intel App is staged in `build/x86_64/Packpier.app`. The disk image is `build/Packpier-0.1.29-macOS-x86_64.dmg`. This build uses the same Sparkle framework. The current release feed serves an arm64 update ZIP. Maintainers can enable an Intel-compatible signed feed with `PACKPIER_FEED_URL` and `PACKPIER_PUBLIC_ED_KEY`.
 
 `make lint` checks source and distribution files. `make unit` and `make integration` run the test suites. Plugin sources live in [Prism](Plugins/Prism), [Custom Background](Plugins/CustomBackground) and [P-Sign](Resources/BundledPlugins/p-sign). After editing a plugin, run `python3 Scripts/plugin-archives.py` to refresh its marketplace archive.
 

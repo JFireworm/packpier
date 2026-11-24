@@ -51,27 +51,39 @@ private final class ThreadLookup {
 
 struct PrismCatalog {
     static let threadPrefix = "codex:thread:local:"
+    static let projectPrefix = "codex:project:"
     let account: String
     let projects: [[String: String]]
     let aliases: [String: String]
     private let pins: [String]
     private let assignments: [String: [String: String]]
+    private let customSections: [CustomSection]
     private let catalog: ThreadLookup
     private let legacy: ThreadLookup
+
+    private struct CustomSection {
+        let id: String
+        let name: String
+        let threadKeys: [String]
+        let projectKeys: [String]
+
+        var json: JSONObject { ["id": id, "name": name, "threadKeys": threadKeys, "projectKeys": projectKeys] }
+    }
 
     init(root: URL) throws {
         let state = try readJSONObject(root.appendingPathComponent(".codex-global-state.json"))
         let prefix = "electron-owner-atoms:"
         let owners = state.keys.filter { $0.hasPrefix(prefix) }
         let selected = (state["electron-renderer-content-owner"] as? String).map { prefix + $0 }
-        guard let owner = selected.flatMap({ owners.contains($0) ? $0 : nil }) ?? (owners.count == 1 ? owners.first : nil),
+        guard let owner = selected ?? (owners.count == 1 ? owners.first : nil),
               let atoms = state[owner] as? JSONObject else {
             throw WireError.message("无法确定当前 Codex 账户")
         }
-        account = String(owner.dropFirst(prefix.count))
-        guard account.range(of: #"\A[a-zA-Z0-9_-]{1,128}\z"#, options: .regularExpression) != nil else {
+        let currentAccount = String(owner.dropFirst(prefix.count))
+        guard currentAccount.range(of: #"\A[a-zA-Z0-9_-]{1,128}\z"#, options: .regularExpression) != nil else {
             throw WireError.message("无效账户标识")
         }
+        account = currentAccount
         guard let pinned = atoms["app-server-pinned-thread-order-v1"] as? [String] else {
             throw WireError.message("当前 Codex 置顶数据格式不受支持")
         }
@@ -99,6 +111,26 @@ struct PrismCatalog {
             for (old, native) in mapping { aliases[native] = old }
         }
         self.aliases = aliases
+        let sectionKey = "sidebar-custom-sections-v3"
+        // Some builds place the account map inside the owner atom store.
+        let persisted = state["electron-persisted-atom-state"] as? JSONObject
+        let scoped = [atoms[sectionKey], state[sectionKey], persisted?[sectionKey]]
+            .lazy.compactMap { ($0 as? JSONObject)?[currentAccount] }.first
+        let rawSections = scoped as? [JSONObject]
+            ?? (scoped as? JSONObject)?["sections"] as? [JSONObject]
+            ?? atoms[sectionKey] as? [JSONObject] ?? []
+        customSections = rawSections.compactMap { section in
+            guard let id = section["id"] as? String, !id.isEmpty,
+                  let name = (section["name"] ?? section["title"]) as? String,
+                  let items = section["itemKeys"] as? [String] else { return nil }
+            let threadKeys = items.filter { $0.hasPrefix(Self.threadPrefix) && $0.count > Self.threadPrefix.count }
+            let projectKeys = items.compactMap { item -> String? in
+                guard item.hasPrefix(Self.projectPrefix) else { return nil }
+                let id = String(item.dropFirst(Self.projectPrefix.count))
+                return id.isEmpty ? nil : Self.projectPrefix + (aliases[id] ?? id)
+            }
+            return CustomSection(id: id, name: name, threadKeys: threadKeys, projectKeys: projectKeys)
+        }
         catalog = try ThreadLookup(root.appendingPathComponent("sqlite/codex.db"), sql:
             "SELECT display_title, cwd, project_id FROM local_thread_catalog WHERE thread_id=? AND host_id='local'")
         legacy = try ThreadLookup(root.appendingPathComponent("state_5.sqlite"), sql:
@@ -114,8 +146,11 @@ struct PrismCatalog {
 
     func sidebar(inherited: Set<String>, editing: String?) throws -> (state: JSONObject, editable: Set<String>) {
         var threads: [JSONObject] = []
+        var customThreads: [JSONObject] = []
         var locations: JSONObject = [:]
         var editable = Set(projects.compactMap { $0["id"].map { "project:" + $0 } })
+        let sectionThreads = Set(customSections.flatMap(\.threadKeys))
+        for key in customSections.flatMap(\.projectKeys) { editable.insert(String(key.dropFirst("codex:".count))) }
         for (index, id) in pins.enumerated() {
             let row = try catalog.row(id)
             let old = try legacy.row(id)
@@ -127,19 +162,25 @@ struct PrismCatalog {
             locations[key] = location
             editable.insert(key)
         }
-        for key in inherited.union(editing.map { [$0] } ?? []) where key.hasPrefix(Self.threadPrefix) && locations[key] == nil {
+        let detailKeys = sectionThreads.union(inherited).union(editing.map { [$0] } ?? [])
+        for key in detailKeys.sorted() where key.hasPrefix(Self.threadPrefix) {
             let id = String(key.dropFirst(Self.threadPrefix.count))
-            guard !id.isEmpty else { continue }
+            guard !id.isEmpty, locations[key] == nil || sectionThreads.contains(key) else { continue }
             let row = try catalog.row(id)
             let old = try legacy.row(id)
             let archived = (Int(old?["archived"] ?? "") ?? 0) != 0
-            if key == editing, !pins.contains(id), !archived, row != nil || old != nil { editable.insert(key) }
-            if inherited.contains(key) {
-                locations[key] = project(id: id, row: row, fallback: archived ? nil : old) as Any? ?? NSNull()
+            let inSection = sectionThreads.contains(key)
+            if (key == editing || inSection), !archived, row != nil || old != nil { editable.insert(key) }
+            let location: Any = project(id: id, row: row, fallback: archived ? nil : old) as Any? ?? NSNull()
+            if inherited.contains(key) || inSection { locations[key] = location }
+            if inSection, !archived, row != nil || old != nil {
+                let title = (row?["display_title"]).flatMap { $0.isEmpty ? nil : $0 } ?? old?["name"] ?? id
+                customThreads.append(["id": id, "key": key, "title": title, "projectId": location])
             }
         }
         let visibleProjects = projects.map { $0.filter { $0.key != "path" } }
         return (["account": account, "threads": threads, "projects": visibleProjects,
-                 "projectAliases": aliases, "threadProjects": locations], editable)
+                 "projectAliases": aliases, "threadProjects": locations,
+                 "customSections": customSections.map(\.json), "customThreads": customThreads], editable)
     }
 }

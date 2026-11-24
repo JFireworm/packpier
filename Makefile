@@ -22,4 +22,5 @@ integration: build
 	$(PYTHON) Tests/third-party-node.py
 	$(PYTHON) Tests/plugin-library.py
 	$(PYTHON) Tests/window-effects.py
+	$(PYTHON) Tests/window-takeover.py
 check: lint unit integration

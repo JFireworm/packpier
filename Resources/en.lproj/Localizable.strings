@@ -286,3 +286,11 @@
 "Codex 已重新打开，窗口仍未连接。" = "Codex reopened. Its window is still disconnected.";
 "Codex 运行状态已变化，请查看连接详情。" = "The state of Codex changed. Check Connection Details.";
 "需要 Node.js 22+" = "Requires Node.js 22+";
+"接管窗口失败" = "Window takeover failed";
+"另一个加载器正在运行" = "Another loader is running";
+"请退出其他 Packpier 或旧加载器，当前窗口会自动重试。" = "Quit the other Packpier or legacy loader. This window will retry automatically.";
+"请退出其他 Packpier 或旧加载器，然后点「重新连接」。" = "Quit the other Packpier or legacy loader, then click Reconnect.";
+"正在等待 Codex 连接端口…" = "Waiting for the Codex port…";
+"正在连接 Codex 窗口…" = "Connecting to the Codex window…";
+"Codex 已重新打开，连接端口尚未就绪。" = "Codex reopened, but its connection port did not become ready.";
+"重试" = "Retry";

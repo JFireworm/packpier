@@ -30,7 +30,7 @@ Packpier 是 Codex 桌面端的 macOS 原生插件管理器：安装、排序、
 
 ## 安装
 
-**系统要求：** macOS 14 或更高。0.1.28 发布包为 Apple Silicon（arm64）版本。
+Packpier 需要 macOS 14 或更高版本。打开「关于本机」确认芯片类型。Apple M 系列芯片下载 `macOS-arm64.dmg` 附件，Intel 处理器下载 `macOS-x86_64.dmg` 附件。
 
 1. 打开 [GitHub Releases](https://github.com/JFireworm/packpier/releases/latest)，下载对应的 DMG。
 2. 打开 DMG，把 **Packpier.app 拖到同一窗口里的 Applications（应用程序）**。推出磁盘映像后，从「应用程序」打开 Packpier。
@@ -38,7 +38,7 @@ Packpier 是 Codex 桌面端的 macOS 原生插件管理器：安装、排序、
 
 当前构建使用 ad-hoc 签名，**未经 Apple 公证**。如果 macOS 阻止首次打开，请确认文件来自本项目的 GitHub Releases，然后前往「系统设置 → 隐私与安全性」选择「仍要打开」。
 
-首次启动时，Packpier 会把自己注册为登录项。如果 macOS 要求批准，可在「设置与更新 → 打开登录项设置」完成。「自动更新」默认开启，也可以在同一页关闭。
+首次启动时，Packpier 会把自己注册为登录项。如果 macOS 要求批准，可在「设置与更新 → 打开登录项设置」完成。Apple Silicon 默认开启自动更新，可在同一页关闭。Intel 用户从 Releases 手动下载新版 x86_64 DMG 更新。
 
 ## 连接 Codex
 
@@ -74,6 +74,15 @@ make check
 open build/Packpier.app
 ./Scripts/build-dmg.sh
 ```
+
+在 Apple Silicon 上交叉构建 Intel 版，先运行 `make bootstrap`，再执行：
+
+```sh
+PACKPIER_ARCH=x86_64 ./Scripts/build.sh
+PACKPIER_ARCH=x86_64 ./Scripts/build-dmg.sh
+```
+
+Intel App 输出到 `build/x86_64/Packpier.app`，安装包为 `build/Packpier-0.1.29-macOS-x86_64.dmg`。Intel 版嵌入相同的 Sparkle 框架。现有发布源提供 arm64 更新 ZIP。维护者可以通过 `PACKPIER_FEED_URL` 和 `PACKPIER_PUBLIC_ED_KEY` 指定兼容 Intel 的签名更新源。
 
 `make lint` 检查源码和分发文件，`make unit` 和 `make integration` 运行测试。内置插件源码位于 [Prism](Plugins/Prism)、[自定义背景](Plugins/CustomBackground) 和 [P-Sign](Resources/BundledPlugins/p-sign)。修改插件后执行 `python3 Scripts/plugin-archives.py` 同步市场归档。
 
