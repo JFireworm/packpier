@@ -223,6 +223,7 @@
 :root[data-packpier-cbgp-theme]
   [data-app-shell-main-content-top-fade]
   > [aria-hidden="true"],
+/* Codex 26.1117.41037 renders the thread header fade with this Tailwind utility. */
 :root[data-packpier-cbgp-theme]
   [data-app-shell-main-surface="default"]
   [aria-hidden="true"][class~="pointer-events-none"][class*="bg-[image:var(--app-shell-content-fade,"],
@@ -259,7 +260,8 @@
   background-image: none !important;
 }
 
-/* 新版会话布局将底板与渐变绘制在输入区外层的两个伪元素上。 */
+/* Codex 26.1117.41037 draws the composer fill and fade on this wrapper's pseudo-elements.
+   If the host changes its markup, the selector stops matching and keeps the native paint. */
 :root[data-packpier-cbgp-theme]
   [data-app-shell-main-surface="default"] [data-app-action-timeline-scroll]
   > [class~="absolute"][class~="pointer-events-none"]:has(> [data-thread-scroll-footer="true"])::before,

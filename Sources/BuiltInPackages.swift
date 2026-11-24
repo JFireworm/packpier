@@ -21,8 +21,7 @@ extension BuiltInPackages {
                 guard let old = manifest(destination)?["version"] as? String,
                       let new = shipped["version"] as? String else { continue }
                 let signUpdate = id == sign && old.compare(new, options: .numeric) == .orderedAscending
-                let previousBackground = ["1.3.14", "1.3.15", "1.3.16"].contains(old) || old.range(of: #"^1\.3\.14-packpier\.[1-5]$"#, options: .regularExpression) != nil
-                let backgroundRelease = id == "custom-background" && new == "1.3.17" && previousBackground
+                let backgroundRelease = id == background && upgradesBackground(from: old, to: new)
                 let prismUpdate = id == "prism" && old == "0.1.11" && new == "0.1.12"
                 guard signUpdate || prismUpdate || backgroundRelease else { continue }
             }

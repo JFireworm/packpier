@@ -43,10 +43,53 @@ async function checkTransparentWindow(effects, storageKey) {
     footerFade: getComputedStyle(footerFade, "::before").backgroundImage,
     footerFill: getComputedStyle(footerFade, "::after").backgroundColor,
   });
+  const timeline = fixture.querySelector("#timeline");
+  const transcript = fixture.querySelector("#transcript");
+  const subscriptions = new Set();
+  const add = timeline.addEventListener.bind(timeline);
+  const remove = timeline.removeEventListener.bind(timeline);
+  timeline.addEventListener = (type, callback, options) => {
+    if (type === "scroll") subscriptions.add(callback);
+    add(type, callback, options);
+  };
+  timeline.removeEventListener = (type, callback, options) => {
+    if (type === "scroll") subscriptions.delete(callback);
+    remove(type, callback, options);
+  };
+
+  const NativeResizeObserver = window.ResizeObserver;
+  const observed = new Set();
+  window.ResizeObserver = class extends NativeResizeObserver {
+    observe(target) {
+      if (target === transcript) observed.add(this);
+      super.observe(target);
+    }
+    disconnect() {
+      observed.delete(this);
+      super.disconnect();
+    }
+  };
+  const requestFrame = window.requestAnimationFrame;
+  const cancelFrame = window.cancelAnimationFrame;
+  const frames = new Map();
+  let frameId = 0;
+  // Drive frames explicitly because headless Chromium uses virtual time.
+  window.requestAnimationFrame = callback => {
+    frames.set(++frameId, callback);
+    return frameId;
+  };
+  window.cancelAnimationFrame = id => frames.delete(id);
+  function renderFrame() {
+    const callbacks = [...frames.values()];
+    frames.clear();
+    for (const callback of callbacks) callback(performance.now());
+  }
+
   const nativePaint = paint();
   const previous = localStorage.getItem(storageKey);
   localStorage.setItem(storageKey, JSON.stringify({ kind: "transparent" }));
-  effects.apply({ enabled: true, packages: [{ id: "custom-background" }] });
+  const state = { enabled: true, packages: [{ id: "custom-background" }] };
+  effects.apply(state);
   check(document.documentElement.hasAttribute("data-packpier-cbgp-transparent"), "Transparent mode did not mount");
   for (const opacity of ["1", "0"]) {
     backdrop.style.opacity = opacity;
@@ -59,28 +102,66 @@ async function checkTransparentWindow(effects, storageKey) {
       `Background override affected ${selector}`);
   }
 
-  const timeline = fixture.querySelector("#timeline");
-  const transcript = fixture.querySelector("#transcript");
+  check(subscriptions.size === 1 && observed.size === 1, "Missing clipping subscriptions");
   const { left, top } = timeline.getBoundingClientRect();
   const transcriptAt = y => document.elementsFromPoint(left + 16, top + y).includes(transcript);
+  const measure = transcript.getBoundingClientRect.bind(transcript);
+  let reads = 0;
+  transcript.getBoundingClientRect = () => {
+    reads++;
+    return measure();
+  };
   timeline.scrollTop = 160;
-  timeline.dispatchEvent(new Event("scroll"));
+  for (let i = 0; i < 5; i++) timeline.dispatchEvent(new Event("scroll"));
+  check(reads === 0, "Scroll measured layout before the animation frame");
+  renderFrame();
+  check(reads === 1, "Scroll did not coalesce to one layout measurement");
   const visible = [18, 110, 222].map(transcriptAt);
   check(!visible[0] && visible[1] && !visible[2],
     `Unexpected scroll boundary at ${timeline.scrollTop}: ${visible.join(", ")} (${getComputedStyle(transcript).clipPath})`);
   footerFade.style.height = "96px";
   window.dispatchEvent(new Event("resize"));
   await new Promise(resolve => setTimeout(resolve, 120));
+  renderFrame();
   check(transcriptAt(110) && !transcriptAt(160), "Growing the composer did not update the transcript boundary");
   const composer = fixture.querySelector("#composer");
   const composerBox = composer.getBoundingClientRect();
   check(document.elementFromPoint(composerBox.x + 8, composerBox.y + 8) === composer,
     "Clipping the transcript affected interaction with the composer");
 
-  effects.close();
-  backdrop.style.opacity = "0";
-  check(JSON.stringify(paint()) === JSON.stringify(nativePaint), "Disabling the effect did not restore native decorations");
-  check(transcriptAt(18) && transcriptAt(222), "Disabling the effect did not restore native scrolling");
+  const marker = "data-packpier-cbgp-transcript-clip";
+  const clearClip = () => !transcript.hasAttribute(marker) &&
+    !transcript.style.getPropertyValue("--ct-cbgp-transcript-clip") &&
+    getComputedStyle(transcript).clipPath === "none" && !subscriptions.size && !observed.size;
+
+  topFade.remove();
+  await new Promise(resolve => setTimeout(resolve, 120));
+  check(clearClip(), "Unrecognized Codex layout did not fall back to native scrolling");
+  timeline.before(topFade);
+  await new Promise(resolve => setTimeout(resolve, 120));
+  check(transcript.hasAttribute(marker) && subscriptions.size === 1 && observed.size === 1, "Clipping did not recover");
+
+  const stopEffect = [
+    () => effects.apply({ ...state, enabled: false }),
+    () => effects.close(),
+  ];
+  for (const stop of stopEffect) {
+    effects.apply(state);
+    renderFrame();
+    const beforeScroll = reads;
+    timeline.dispatchEvent(new Event("scroll"));
+    check(frames.size === 1, "Scroll did not queue a clipping frame");
+    stop();
+    check(clearClip() && frames.size === 0, "Clipping attributes or subscriptions survived teardown");
+    renderFrame();
+    check(reads === beforeScroll, "A clipping update ran after teardown");
+    backdrop.style.opacity = "0";
+    check(JSON.stringify(paint()) === JSON.stringify(nativePaint), "Teardown did not restore native decorations");
+    check(transcriptAt(18) && transcriptAt(222), "Teardown did not restore native scrolling");
+  }
+  window.ResizeObserver = NativeResizeObserver;
+  window.requestAnimationFrame = requestFrame;
+  window.cancelAnimationFrame = cancelFrame;
   localStorage.setItem(storageKey, previous);
   fixture.remove();
 }

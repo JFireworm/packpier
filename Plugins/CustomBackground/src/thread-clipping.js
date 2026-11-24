@@ -1,3 +1,4 @@
+// These layout anchors come from Codex 26.1117.41037. Missing anchors disable clipping.
 const MAIN_SURFACE = '[data-app-shell-main-surface="default"]';
 const TIMELINE = "[data-app-action-timeline-scroll]";
 const TRANSCRIPT = '[class~="[container-name:thread-content]"]';
@@ -11,7 +12,16 @@ export const THREAD_CLIP_ANCHORS = [TIMELINE, TRANSCRIPT, HEADER, FOOTER].join("
 export function createThreadClipping() {
   let layout = null;
   let lastClip = "";
-  const resizeObserver = new ResizeObserver(update);
+  let pendingFrame = null;
+  const resizeObserver = new ResizeObserver(scheduleUpdate);
+
+  function scheduleUpdate() {
+    if (!layout || pendingFrame !== null) return;
+    pendingFrame = requestAnimationFrame(() => {
+      pendingFrame = null;
+      update();
+    });
+  }
 
   function update() {
     if (!layout) return;
@@ -30,8 +40,12 @@ export function createThreadClipping() {
 
   function clear() {
     if (!layout) return;
+    if (pendingFrame !== null) {
+      cancelAnimationFrame(pendingFrame);
+      pendingFrame = null;
+    }
     resizeObserver.disconnect();
-    layout.timeline.removeEventListener("scroll", update);
+    layout.timeline.removeEventListener("scroll", scheduleUpdate);
     layout.transcript.removeAttribute(MARKER);
     layout.transcript.style.removeProperty(CLIP_PROPERTY);
     layout = null;
@@ -43,7 +57,9 @@ export function createThreadClipping() {
     const timeline = Array.from(timelines).find(node => node.clientHeight > 0);
     const transcript = timeline?.querySelector(`:scope > ${TRANSCRIPT}`);
     const header = timeline?.closest(MAIN_SURFACE)?.querySelector(HEADER);
-    const footer = timeline?.querySelector(`:scope > [class~="absolute"][class~="pointer-events-none"]:has(> ${FOOTER})`);
+    const footer = timeline?.querySelector(
+      `:scope > [class~="absolute"][class~="pointer-events-none"] > ${FOOTER}`,
+    )?.parentElement;
     if (!transcript || !header || !footer) {
       clear();
       return;
@@ -53,10 +69,12 @@ export function createThreadClipping() {
       clear();
       layout = { timeline, transcript, header, footer };
       transcript.setAttribute(MARKER, "");
-      timeline.addEventListener("scroll", update, { passive: true });
+      timeline.addEventListener("scroll", scheduleUpdate, { passive: true });
       for (const node of Object.values(layout)) resizeObserver.observe(node);
+      update();
+    } else {
+      scheduleUpdate();
     }
-    update();
   }
 
   return { sync, clear };

@@ -77,6 +77,9 @@ final class PluginLibrary {
         }
         lock = fd
         try finishPendingRemoval()
+        if let bundled, let version = manifests[BuiltInPackages.background]?["version"] as? String {
+            try upgradeBuiltInBackground(from: bundled, version: version)
+        }
     }
 
     deinit { close(lock) }
@@ -215,6 +218,41 @@ final class PluginLibrary {
             hash = hash &* 0x100000001b3
         }
         return String(format: "%016llx", hash)
+    }
+
+    private func upgradeBuiltInBackground(from bundled: URL, version: String) throws {
+        let fm = FileManager.default
+        let id = BuiltInPackages.background
+        let packages = root.appendingPathComponent("packages")
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
+        guard try packages.resourceValues(forKeys: keys).isSymbolicLink == false else {
+            throw LibraryError("Unexpected package directory symlink")
+        }
+        let installed = try plugins(settings: [:]).first { $0.id == id }
+        guard let directory = installed?.directory,
+              let old = try readObject(directory.appendingPathComponent("package.json"))["version"] as? String,
+              BuiltInPackages.upgradesBackground(from: old, to: version) else { return }
+
+        let backups = root.appendingPathComponent("Backups", isDirectory: true)
+        try fm.createDirectory(at: backups, withIntermediateDirectories: true)
+        guard try backups.resourceValues(forKeys: keys).isSymbolicLink == false else {
+            throw LibraryError("Unexpected package backup directory symlink")
+        }
+        let transaction = UUID().uuidString
+        let stage = packages.appendingPathComponent(".packpier-upgrade-" + transaction)
+        let backup = backups.appendingPathComponent(id + "-" + old + "-" + transaction)
+        defer { try? fm.removeItem(at: stage) }
+        try fm.copyItem(at: bundled.appendingPathComponent(id), to: stage)
+        do {
+            try fm.copyItem(at: directory, to: backup)
+            // Both directories are on the library volume and the loader holds the library lock.
+            if renamex_np(stage.path, directory.path, UInt32(RENAME_SWAP)) != 0 {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        } catch {
+            try? fm.removeItem(at: backup)
+            throw error
+        }
     }
 
     // Moving the package out of discovery commits the uninstall. Keep its manifest intact
