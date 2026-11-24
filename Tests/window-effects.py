@@ -7,11 +7,10 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[1]
-renderer = root / "Loader/Renderer"
+renderer = root / "build/RendererSources"
 chrome = os.environ.get("CHROME_BIN", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 with TemporaryDirectory(prefix="packpier-effects-") as folder:
     page = Path(folder) / "check.html"
-    subprocess.run(["npm", "run", "build"], cwd=renderer, check=True)
     subprocess.run([renderer / "node_modules/.bin/esbuild", root / "Tests/window-effects.js",
                     "--bundle", "--outfile=" + str(page.with_suffix(".js"))], check=True)
     # Generate the browser input through the Swift loader using real builtin manifests.
@@ -31,7 +30,9 @@ with TemporaryDirectory(prefix="packpier-effects-") as folder:
                 ("getWindowPlan", {}), ("setPackageEnabled", {"packageID": order[2], "enabled": True}),
                 ("getWindowPlan", {}), ("setPackageEnabled", {"packageID": order[2], "enabled": False}),
                 ("getWindowPlan", {})]
-    result = subprocess.run([root / "build/packpier-loader"], input="".join(
+    offline_loader = ["/usr/bin/sandbox-exec", "-p", "(version 1)(allow default)(deny network*)",
+                      root / "build/packpier-loader"]
+    result = subprocess.run(offline_loader, input="".join(
         json.dumps({"id": i, "method": method, "params": params}) + "\n"
         for i, (method, params) in enumerate(requests)), capture_output=True, text=True, check=True)
     replies = [reply["result"] for reply in map(json.loads, result.stdout.splitlines()) if "id" in reply]

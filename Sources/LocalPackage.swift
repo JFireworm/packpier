@@ -9,6 +9,8 @@ final class LocalPackage: Identifiable {
     let name: String
     let version: String
     let reason: String?
+    private let memberNames: [String]
+    private let manifestMember: String
     private let staging: URL
 
     init(source: URL) throws {
@@ -44,6 +46,8 @@ final class LocalPackage: Identifiable {
                 throw PackpierError.message("插件清单含有重复的适配器声明。")
             }
             self.manifestData = data
+            self.memberNames = names
+            self.manifestMember = entry
             self.name = name
             self.version = version
             self.reason = ((target["permissions"] as? Fields)?["node"] as? Fields)?["reason"] as? String
@@ -56,6 +60,29 @@ final class LocalPackage: Identifiable {
         }
     }
     deinit { try? FileManager.default.removeItem(at: staging) }
+
+    /// Copy member bytes into a new private directory. Archive symlinks, permissions and
+    /// absolute paths are never materialized by an archive extractor.
+    func copyNodeSources(to destination: URL) throws {
+        let prefix = String(manifestMember.dropLast("package.json".count))
+        var remaining = 64 * 1024 * 1024
+        guard memberNames.count <= 4096 else { throw PackpierError.message("Too many files in plugin archive") }
+        for name in memberNames where name.hasPrefix(prefix) && !name.hasSuffix("/") {
+            let path = String(name.dropFirst(prefix.count))
+            if path.hasPrefix("__MACOSX/") { continue }
+            let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+            // unzip -p accepts wildcard patterns. Only pass unambiguous literal member names.
+            guard name.first != "-", name.range(of: #"[\x00-\x1f\x7f\\*?\[\]]"#, options: .regularExpression) == nil,
+                  !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+                throw PackpierError.message("Invalid path in plugin archive")
+            }
+            let bytes = try Self.unzip(["-p", url.path, name], limit: remaining)
+            remaining -= bytes.count
+            let target = destination.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try bytes.write(to: target, options: .withoutOverwriting)
+        }
+    }
 
     private static func unzip(_ args: [String], limit: Int) throws -> Data {
         let child = Process(), pipe = Pipe()

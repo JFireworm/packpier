@@ -1,11 +1,12 @@
 import AppKit
 
 @main enum SwiftUnit {
-    @MainActor static func main() throws {
+    @MainActor static func main() async throws {
         try MarketApplicationsCheck.run()
         try WeChatOverlayCheck.run()
         try NativeUI.checkTime()
         try checkConnectionDiagnostics()
+        try await CodexRestartCheck.run()
     }
 
     @MainActor static func checkConnectionDiagnostics() throws {

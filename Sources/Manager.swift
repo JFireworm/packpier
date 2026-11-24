@@ -152,13 +152,8 @@ import UniformTypeIdentifiers
                     record("Codex: " + message)
                 }
                 try Task.checkCancellation()
-                restartMessage = "正在连接 Codex"
-                let clock = ContinuousClock()
-                let deadline = clock.now.advanced(by: .seconds(25))
-                while state.enabled && !state.connected && clock.now < deadline {
-                    try await Task.sleep(for: .milliseconds(250))
-                }
-                restartMessage = state.enabled && !state.connected ? "Codex 已重新打开，窗口仍未连接。" : nil
+                // A verified page is available. The loader owns the subsequent mount status.
+                restartMessage = nil
             } catch is CancellationError {
                 return
             } catch {

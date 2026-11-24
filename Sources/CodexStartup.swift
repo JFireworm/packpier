@@ -1,6 +1,17 @@
 import AppKit
+import Darwin
 
 /// Observes the app independently of whether any plugin has mounted in its window.
+enum CodexLaunch {
+    /// The same loopback-only DevTools contract Codex Tweaks uses. Packpier only ever
+    /// launches Codex with these local arguments; it never rewrites the Codex bundle.
+    static let arguments = [
+        "--remote-debugging-address=127.0.0.1",
+        "--remote-debugging-port=9335",
+        "--remote-allow-origins=http://127.0.0.1:9335",
+    ]
+}
+
 @MainActor final class CodexStartup {
     static let bundleID = CodexListener.bundleID
     private var monitor: Task<Void, Never>?
@@ -52,16 +63,17 @@ import AppKit
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             return "未找到 Codex 应用"
         }
-        return await open(url) ? "正在启动 Codex" : "未能启动 Codex"
+        return await open(url) != nil ? "正在启动 Codex" : "未能启动 Codex"
     }
 
-    private static func open(_ url: URL) async -> Bool {
+    private static func open(_ url: URL) async -> pid_t? {
         let config = NSWorkspace.OpenConfiguration()
+        config.arguments = CodexLaunch.arguments
         config.activates = false
-        config.createsNewApplicationInstance = false
+        config.createsNewApplicationInstance = true
         return await withCheckedContinuation { continuation in
             NSWorkspace.shared.openApplication(at: url, configuration: config) { app, error in
-                continuation.resume(returning: app != nil && error == nil)
+                continuation.resume(returning: error == nil ? app?.processIdentifier : nil)
             }
         }
     }
@@ -77,16 +89,12 @@ import AppKit
         guard status == .missing, !app.isTerminated else {
             throw PackpierError.message("Codex 运行状态已变化，请查看连接详情。")
         }
-        report("正在等待 Codex 退出…")
-        guard app.terminate() else { throw PackpierError.message("Codex 尚未退出，请先处理保存提示。") }
-        let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: .seconds(20))
-        while !app.isTerminated {
-            guard clock.now < deadline else { throw PackpierError.message("Codex 尚未退出，请先处理保存提示。") }
-            try await Task.sleep(for: .milliseconds(200))
-        }
-        try Task.checkCancellation()
-        report("正在启动 Codex")
-        guard await open(url) else { throw PackpierError.message("未能启动 Codex") }
+        let workflow = CodexRestart(requestQuit: { app.terminate() }, oldProcessExited: { app.isTerminated },
+            runningPIDs: {
+                NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+                    .filter { !$0.isTerminated }.map(\.processIdentifier)
+            }, open: { await open(url) }, ready: { await CodexReadiness.ready(pid: $0) },
+            forceQuit: { kill(pid, SIGKILL) })
+        try await workflow.run(report: report)
     }
 }

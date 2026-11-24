@@ -272,7 +272,6 @@
 "Codex 已运行，未检测到可用的本机连接" = "Codex is running. No local connection detected.";
 "添加应用（开发中）" = "Add App (in development)";
 "内置运行环境缺失，请重新安装 Packpier。" = "The bundled runtime is missing. Reinstall Packpier.";
-"内置运行环境" = "Bundled runtime";
 "插件加载器" = "Plugin loader";
 "已响应" = "Responding";
 "尚未收到响应" = "No response yet";
@@ -286,3 +285,4 @@
 "Codex 尚未退出，请先处理保存提示。" = "Codex is still open. Check for a save prompt before retrying.";
 "Codex 已重新打开，窗口仍未连接。" = "Codex reopened. Its window is still disconnected.";
 "Codex 运行状态已变化，请查看连接详情。" = "The state of Codex changed. Check Connection Details.";
+"需要 Node.js 22+" = "Requires Node.js 22+";

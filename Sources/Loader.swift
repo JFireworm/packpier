@@ -123,11 +123,11 @@ struct HostState {
         if !hasEnabled(p.id) { return "已停用" }
         if building(p.id) { return "正在编译" }
         if failure(p.id) != nil || p.fields["validationError"] is String { return "需要处理" }
-        if !p.hasBuild { return "待编译" }
         if p.canAuthorize { return "待授权" }
+        if p.node["running"] as? Bool == true { return "已运行" }
+        if !p.hasBuild { return "待编译" }
         if !enabled { return "加载器已暂停" }
         if !connected { return "等待连接" }
-        if p.node["running"] as? Bool == true { return "已运行" }
         return p.presentation["statusTitle"] as? String ?? "已编译"
     }
 }

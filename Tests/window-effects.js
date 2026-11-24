@@ -80,6 +80,9 @@ async function run() {
   check(JSON.parse(localStorage.getItem(storageKey)).favorites[0].file === favorite.file, "Favorite lost");
   check(effects.apply(state).mounted.length === 3, "Re-enable failed");
   effects.close();
+  check(document.querySelectorAll("[data-packpier-plugin]").length === 0, "Plugin elements survived shutdown");
+  check(![...document.querySelectorAll("[style]")].some(el => el.style.getPropertyValue("--prism-native-color")),
+    "Prism row colors survived shutdown");
   const host = globalThis.__PACKPIER__;
   const navState = { enabled: true, packages: [{id:"p-sign"}, {id:"custom-background"}] };
   const many = Array.from({length: 64}, (_, i) => ({

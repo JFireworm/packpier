@@ -35,9 +35,16 @@ loader = (root / "Loader/main.swift").read_text()
 cases = set(re.findall(r'"(\w+)"', "\n".join(re.findall(r'^    case (.*?):', loader, re.M))))
 manager = "\n".join(p.read_text() for p in (root / "Sources").glob("*.swift"))
 calls = set(re.findall(r'(?:send|rpc)\("(\w+)"', manager))
-assert not calls - cases - {"buildPackage", "authorizeNodePackage"}, calls - cases
+assert not calls - cases - {"buildPackage"}, calls - cases
 print("PASS project links, Skill, signed update feed, marketplace metadata and loader command contract")
 
-versions = [re.search(r'const VERSION = "([^"]+)"', (root / source).read_text()).group(1)
-            for source in ("Loader/Renderer/host.js", "Loader/WindowHost/window-host.mjs")]
-assert versions[0] == versions[1], "Host and renderer protocol versions differ"
+sources = {
+    "renderer": ("Loader/Renderer/host.js", r'const VERSION = "([^"]+)"'),
+    "native host": ("Loader/WindowHost.swift", r'let bundleVersion = "([^"]+)"'),
+}
+versions = {}
+for name, (source, pattern) in sources.items():
+    match = re.search(pattern, (root / source).read_text())
+    assert match, f"Missing protocol version in {source}"
+    versions[name] = match[1]
+assert len(set(versions.values())) == 1, f"Host and renderer protocol versions differ: {versions}"

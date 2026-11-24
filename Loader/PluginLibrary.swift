@@ -164,6 +164,7 @@ final class PluginLibrary {
             if let issue = plugin.dependencyError { row["validationError"] = issue }
             if let override = (settings["packages"] as? Object)?[plugin.id] as? Object {
                 row["priorityOverride"] = override["priorityOverride"]
+                row["approvedNodeSource"] = override["approvedNodeSource"]
             }
             // First-party window effects are compiled into Packpier at app build time, so they
             // are always current; there is no separate package build step in this loader.
@@ -311,6 +312,31 @@ final class PluginLibrary {
             state["enabled"] = enabled
         }
         try persist(state, to: "app-state.json")
+    }
+
+    func approveNodeSource(_ token: String, id: String) throws {
+        guard !BuiltInPackages.ids.contains(id) else { throw LibraryError("Built-in plugin has no Node backend") }
+        var settings = try config("package-settings.json")
+        var packages = settings["packages"] as? Object ?? [:]
+        var package = packages[id] as? Object ?? [:]
+        package["approvedNodeSource"] = token
+        packages[id] = package
+        settings["packages"] = packages
+        try persist(settings, to: "package-settings.json")
+    }
+
+    func nodeDataDirectory(_ id: String) throws -> URL {
+        let fm = FileManager.default
+        var folder = root
+        for part in ["node-data", Self.fingerprint(id)] {
+            folder.appendPathComponent(part, isDirectory: true)
+            if !fm.fileExists(atPath: folder.path) {
+                try fm.createDirectory(at: folder, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+            }
+            let traits = try folder.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
+            guard traits.isDirectory == true, traits.isSymbolicLink == false else { throw LibraryError("Invalid plugin data directory") }
+        }
+        return folder
     }
 
     func setOrder(_ ids: [String]) throws {

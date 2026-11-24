@@ -94,6 +94,7 @@ enum MarketHealth: Equatable {
     static func current(_ p:TweakPackage, state:HostState, mounted:Set<String>) -> Self {
         guard state.hasEnabled(p.id) else { return .disabled }
         if state.failure(p.id) != nil || p.fields["validationError"] is String || !(p.node["lastError"] as? String ?? "").isEmpty { return .fault }
+        if state.enabled && p.node["running"] as? Bool == true { return .running }
         guard state.enabled, state.connected, p.hasBuild, p.builtCurrent, !state.building(p.id),
               !p.canAuthorize, mounted.contains(p.id) else { return .waiting }
         return .running
@@ -146,6 +147,8 @@ struct MarketplacePage: View {
                         Button("取消") { confirmingRestart = false }.buttonStyle(.link)
                     } else if m.canRestartCodex {
                         Button("重启并连接") { confirmingRestart = true }
+                            .help("Codex 将退出并重新打开。请先保存窗口中未提交的内容。")
+                            .accessibilityHint("Codex 将退出并重新打开。请先保存窗口中未提交的内容。")
                             .buttonStyle(.link).accessibilityIdentifier("market.restartCodex")
                     }
                     if !confirmingRestart { Button("连接详情", action:showConnection).buttonStyle(.link) }
@@ -262,7 +265,7 @@ struct MarketplacePage: View {
     private func installedControls(_ p:TweakPackage,status:MarketHealth) -> some View {
         VStack(alignment:.leading,spacing:9) {
             if let issue = m.state.failure(p.id) ?? p.fields["validationError"] as? String ?? p.node["lastError"] as? String, !issue.isEmpty {
-                Text(verbatim:issue).font(.callout).foregroundStyle(.red).textSelection(.enabled)
+                Text(verbatim:PPText.get(issue)).font(.callout).foregroundStyle(.red).textSelection(.enabled)
             }
             if status == .waiting {
                 Text(PPText.get(m.state.label(p))).font(.caption).foregroundStyle(.secondary)

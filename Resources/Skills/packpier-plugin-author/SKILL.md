@@ -55,6 +55,6 @@ export function activate({ root, onCleanup }) {
 3. 打开 Packpier → 插件市场 → 选择 Codex → 安装本地插件包。核对 ID、版本和权限说明，添加后核对插件记录。内置插件的窗口效果通过构建 Packpier 并运行集成测试验证。同名同版本会复用现有副本。验证新源码时使用隔离的加载器数据目录。
 4. 停用、再次启用，核对界面随开关消失、显示且只出现一次。分别记录编译结果、实际运行平台和看到的效果。
 
-标题栏与设置页使用适配器提供的 UI 接口。需要 Node 时，在清单中声明 `packpier.entrypoints.node` 和 `packpier.permissions.node.reason`，列明读写的数据、联网用途和启动的进程。导入后，在 Packpier 中审阅当前版本的权限。
+标题栏与设置页使用适配器提供的 UI 接口。需要系统 Node.js 22+ 的第三方包应声明 `packpier.entrypoints.node` 和 `packpier.permissions.node.reason`，列明读写的数据、联网用途和启动的进程。包应包含可直接运行的入口及其依赖。入口导出 `activate({ dataDirectory, rpc })`，可用 `rpc.handle(method, handler)` 接收调用，`rpc.emit(name, payload)` 发送事件，并返回清理函数。启用并授权后，Packpier 通过私有 stdio 会话启动后端。修改包内容后需重新授权。
 
 [Packpier 项目与源码](https://github.com/JFireworm/packpier)

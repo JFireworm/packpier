@@ -10,6 +10,11 @@ var library: PluginLibrary?
 let host = WindowHost()
 let outputLock = NSLock()
 let stateLock = NSRecursiveLock()
+let nodeRunner = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
+    .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/NodeRunner/runner.mjs")
+let thirdPartyNodes = ThirdPartyNodes(runner: nodeRunner, onExit: publishState) { plugin, name, payload in
+    write(["event": "nodeEvent", "data": ["plugin": plugin, "name": name, "payload": payload] as Object])
+}
 
 func write(_ object: Object) {
     guard var data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return }
@@ -24,6 +29,7 @@ func write(_ object: Object) {
 func mergedState() throws -> Object {
     guard let library else { throw LibraryError("Initialize the library first") }
     var state = try library.state()
+    thirdPartyNodes.decorate(&state)
     let report = host.status
     let kind = state["enabled"] as? Bool == true ? report.kind : "disabled"
     state["status"] = ["kind": kind, "message": report.message]
@@ -39,12 +45,14 @@ func syncHost() {
     host.sync(enabled: plan.enabled, packages: plan.packages)
 }
 
+func publishState() {
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    if let state = try? mergedState() { write(["event": "state", "data": state]) }
+}
+
 func startHost() {
-    host.start {
-        stateLock.lock()
-        defer { stateLock.unlock() }
-        if let state = try? mergedState() { write(["event": "state", "data": state]) }
-    }
+    host.start(onChange: publishState)
     syncHost()
 }
 
@@ -63,6 +71,7 @@ func handle(_ message: Object) throws -> Object {
         _ = try candidate.state()
         library = candidate
         startHost()
+        try thirdPartyNodes.sync(library: candidate, reload: false)
         return try mergedState()
     }
     guard let library else { throw LibraryError("Initialize the library first") }
@@ -75,6 +84,16 @@ func handle(_ message: Object) throws -> Object {
     case "getWindowPlan":
         return try library.windowEffects()
     case "getState", "reloadPackages": break
+    case "authorizeNodePackage":
+        guard let id = params["packageID"] as? String, let token = params["authorizationID"] as? String else {
+            throw LibraryError("Missing package approval")
+        }
+        try thirdPartyNodes.approve(token, id: id, library: library)
+    case "callNodePackage":
+        guard let id = params["packageID"] as? String, let method = params["method"] as? String else {
+            throw LibraryError("Missing package or method")
+        }
+        return ["value": try thirdPartyNodes.call(id, method: method, parameters: params["parameters"] ?? NSNull())]
     case "installLocalPackage":
         guard let path = params["sourcePath"] as? String, path.hasPrefix("/") else { throw LibraryError("Missing ZIP path") }
         try library.installArchive(URL(fileURLWithPath: path))
@@ -99,6 +118,7 @@ func handle(_ message: Object) throws -> Object {
     default: throw LibraryError("Unsupported operation")
     }
     syncHost()
+    try thirdPartyNodes.sync(library: library, reload: method == "reloadPackages")
     return try mergedState()
 }
 
@@ -117,3 +137,7 @@ while let line = readLine() {
     write(reply)
 }
 host.shutdown()
+stateLock.lock()
+library = nil
+thirdPartyNodes.shutdown()
+stateLock.unlock()

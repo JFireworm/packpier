@@ -153,9 +153,6 @@ struct Dashboard: View {
                 LabeledContent("Codex 窗口") {
                     Text(LocalizedStringKey(m.connection))
                 }
-                if let version = Bundle.main.object(forInfoDictionaryKey:"PackpierNodeVersion") as? String {
-                    LabeledContent("内置运行环境",value:"Node.js " + version)
-                }
                 if let detail = (m.state.raw["status"] as? Fields)?["message"] as? String, !detail.isEmpty {
                     Text(verbatim:detail).font(.callout).textSelection(.enabled)
                 }
