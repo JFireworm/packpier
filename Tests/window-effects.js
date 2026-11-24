@@ -6,17 +6,25 @@ function check(value, detail) {
   if (!value) throw Error(detail);
 }
 
-function checkTransparentWindow(effects, storageKey) {
+async function checkTransparentWindow(effects, storageKey) {
   const fixture = document.createElement("div");
   fixture.innerHTML = `<style>
+      #window-fixture { position: fixed; top: 16px; left: 16px; width: 320px; z-index: 100; }
+      #timeline { height: 240px; overflow-y: auto; }
+      #transcript { height: 720px; background: blue; }
       #top-fade, #footer-fade::before { background-image: linear-gradient(transparent, white); }
+      #top-fade, #footer-fade { position: absolute; left: 0; right: 0; pointer-events: none; z-index: 2; }
+      #top-fade { top: 0; height: 36px; }
+      #footer-fade { bottom: 0; height: 52px; }
+      #composer { position: absolute; right: 10px; bottom: 8px; pointer-events: auto; }
       #footer-fade::before, #footer-fade::after { content: ""; }
       #footer-fade::after, #composer, #dialog { background-color: white; }
     </style>
     <div class="macos-window-backdrop" style="opacity: 0"></div>
-    <section data-app-shell-main-surface="default">
+    <section id="window-fixture" data-app-shell-main-surface="default">
       <div id="top-fade" aria-hidden="true" class="pointer-events-none bg-[image:var(--app-shell-content-fade,linear-gradient(to_bottom,currentColor,transparent))]"></div>
-      <div data-app-action-timeline-scroll>
+      <div id="timeline" data-app-action-timeline-scroll>
+        <div id="transcript" class="[container-name:thread-content]">Chat content</div>
         <div id="footer-fade" class="pointer-events-none absolute">
           <div data-thread-scroll-footer="true">
             <div data-thread-composer-backdrop><textarea id="composer" data-composer-body></textarea></div>
@@ -50,9 +58,29 @@ function checkTransparentWindow(effects, storageKey) {
     check(getComputedStyle(fixture.querySelector(selector)).backgroundColor === "rgb(255, 255, 255)",
       `Background override affected ${selector}`);
   }
+
+  const timeline = fixture.querySelector("#timeline");
+  const transcript = fixture.querySelector("#transcript");
+  const { left, top } = timeline.getBoundingClientRect();
+  const transcriptAt = y => document.elementsFromPoint(left + 16, top + y).includes(transcript);
+  timeline.scrollTop = 160;
+  timeline.dispatchEvent(new Event("scroll"));
+  const visible = [18, 110, 222].map(transcriptAt);
+  check(!visible[0] && visible[1] && !visible[2],
+    `Unexpected scroll boundary at ${timeline.scrollTop}: ${visible.join(", ")} (${getComputedStyle(transcript).clipPath})`);
+  footerFade.style.height = "96px";
+  window.dispatchEvent(new Event("resize"));
+  await new Promise(resolve => setTimeout(resolve, 120));
+  check(transcriptAt(110) && !transcriptAt(160), "Growing the composer did not update the transcript boundary");
+  const composer = fixture.querySelector("#composer");
+  const composerBox = composer.getBoundingClientRect();
+  check(document.elementFromPoint(composerBox.x + 8, composerBox.y + 8) === composer,
+    "Clipping the transcript affected interaction with the composer");
+
   effects.close();
   backdrop.style.opacity = "0";
   check(JSON.stringify(paint()) === JSON.stringify(nativePaint), "Disabling the effect did not restore native decorations");
+  check(transcriptAt(18) && transcriptAt(222), "Disabling the effect did not restore native scrolling");
   localStorage.setItem(storageKey, previous);
   fixture.remove();
 }
@@ -182,7 +210,7 @@ async function run() {
   check(document.querySelectorAll("[data-packpier-plugin]").length === 0, "Plugin elements survived shutdown");
   check(![...document.querySelectorAll("[style]")].some(el => el.style.getPropertyValue("--prism-native-color")),
     "Prism row colors survived shutdown");
-  checkTransparentWindow(effects, storageKey);
+  await checkTransparentWindow(effects, storageKey);
   const host = globalThis.__PACKPIER__;
   const navState = { enabled: true, packages: [{id:"p-sign"}, {id:"custom-background"}] };
   const many = Array.from({length: 64}, (_, i) => ({

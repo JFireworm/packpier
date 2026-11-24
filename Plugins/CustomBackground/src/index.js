@@ -11,6 +11,7 @@ import {
   normalizeBackgroundKind as normalizeKind,
 } from "./background-mode.js";
 import { isCodexPetRendererLocation } from "./renderer-scope.js";
+import { createThreadClipping, THREAD_CLIP_ANCHORS } from "./thread-clipping.js";
 
 const RUNTIME_KEY = Symbol.for("codex-tweaks.codex-custom-background.runtime");
 const LEGACY_RUNTIME_KEY = Symbol.for("codex-tweaks.codex-random-background.runtime");
@@ -39,6 +40,7 @@ const PAGE_ANCHOR_SELECTOR = [
   "button[data-settings-panel-slug]",
   "aside.app-shell-left-panel",
   'main[class*="MainContentSurface"]',
+  THREAD_CLIP_ANCHORS,
 ].join(", ");
 const MASK_DEFAULTS = Object.freeze({
   light: Object.freeze({ color: "#f6f6f6", opacity: 0.72 }),
@@ -223,6 +225,7 @@ export function activate({ api, node, ui }) {
   let windowFrostSurface = null;
   let windowFrostObserver = null;
   let windowFrostClip = "";
+  const threadClipping = createThreadClipping();
   let signShuffle = null;
   let settingsPaneNode = null;
   let previewTheme = document.documentElement.matches('[data-theme="light"], .electron-light') ? "light" : "dark";
@@ -547,6 +550,11 @@ export function activate({ api, node, ui }) {
     }
   }
 
+  function syncBackgroundLayout() {
+    syncWindowFrost();
+    threadClipping.sync(runtimeHost.hasAttribute(THEME_MARKER) ? getActivePageRoot() : null);
+  }
+
   function applyWallpaper() {
     if (disposed) return;
     const transparent = isTransparentBackgroundActive(
@@ -565,7 +573,7 @@ export function activate({ api, node, ui }) {
       node.style.removeProperty("--ct-cbgp-bg-image");
       runtimeHost.removeAttribute(THEME_MARKER);
       removeFrostAppearance();
-      syncWindowFrost();
+      syncBackgroundLayout();
       return;
     }
     if (url) {
@@ -576,10 +584,11 @@ export function activate({ api, node, ui }) {
     node.hidden = false;
     runtimeHost.setAttribute(THEME_MARKER, "");
     applyFrostAppearance();
-    syncWindowFrost();
+    syncBackgroundLayout();
   }
 
   function removeWallpaper() {
+    threadClipping.clear();
     runtimeHost.removeAttribute(THEME_MARKER);
     runtimeHost.removeAttribute(TRANSPARENT_MARKER);
     removeFrostAppearance();
@@ -2005,8 +2014,11 @@ export function activate({ api, node, ui }) {
 
   function syncDOM() {
     if (disposed) return;
-    if (!wallpaperNode?.isConnected) applyWallpaper();
-    syncWindowFrost();
+    if (!wallpaperNode?.isConnected) {
+      applyWallpaper();
+      return;
+    }
+    syncBackgroundLayout();
   }
 
   function scheduleDOMSync() {

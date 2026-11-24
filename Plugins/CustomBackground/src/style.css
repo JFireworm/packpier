@@ -269,6 +269,11 @@
   background: none !important;
 }
 
+/* 裁剪滚动内容，标题栏和输入区保留各自的布局及交互。 */
+:root[data-packpier-cbgp-theme] [data-packpier-cbgp-transcript-clip] {
+  clip-path: var(--ct-cbgp-transcript-clip);
+}
+
 /* 控件磨砂与背景磨砂使用不同标记。这里只覆盖 Codex 的面板/柔和控件
    语义令牌；ghost hover 令牌保持原生值，避免选项高亮再次被改写。 */
 :root[data-packpier-cbgp-theme][data-packpier-cbgp-frost] {
