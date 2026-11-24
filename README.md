@@ -14,9 +14,9 @@ Packpier is a native macOS plugin manager for the Codex desktop app. It installs
 
 ### Prism
 
-Pinned chats are grouped by project. A color strip marks each colored chat, and the swatch on a project row opens its palette.
+Pinned chats can be grouped by project. A color strip marks each colored chat, and the swatch on a project row opens its palette. Saved chat and project colors also appear in custom sections.
 
-<a href="docs/images/prism-sidebar.png"><img src="docs/images/prism-sidebar.png" width="320" alt="Codex sidebar with pinned chats grouped by project and colored titles"></a>
+<a href="docs/images/prism-sections.png"><img src="docs/images/prism-sections.png" width="320" alt="Prism custom sections and project colors guide, showing pinned chats grouped by project and the project color picker"></a>
 
 ### Custom Background
 

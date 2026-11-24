@@ -14,9 +14,9 @@ Packpier 是 Codex 桌面端的 macOS 原生插件管理器：安装、排序、
 
 ### Prism
 
-置顶会话按项目分组，标题上的色条标记单条会话，项目行右侧的色块打开项目色板。
+置顶会话可按项目分组，标题上的色条标记单条会话，项目行右侧的色块打开项目色板。自定义分区里的会话和项目也会显示已保存的配色。
 
-<a href="docs/images/prism-sidebar.png"><img src="docs/images/prism-sidebar.png" width="320" alt="Codex 侧栏中按项目分组的置顶会话与彩色标题"></a>
+<a href="docs/images/prism-sections.png"><img src="docs/images/prism-sections.png" width="320" alt="Prism 自定义分区与项目配色说明图，显示按项目分组的置顶会话和项目色板"></a>
 
 ### 自定义背景
 
