@@ -7,8 +7,11 @@ import SQLite3
         guard matches else { throw WireError.message(reason) }
     }
 
-    static func rejected(_ operation: () async throws -> Void) async throws {
-        do { try await operation() } catch { return }
+    static func rejected(_ message: String? = nil, _ operation: () async throws -> Void) async throws {
+        do { try await operation() } catch {
+            if let message { try check(error.localizedDescription == message, "Unexpected rejection: " + error.localizedDescription) }
+            return
+        }
         throw WireError.message("Expected the operation to fail")
     }
 
@@ -37,25 +40,47 @@ import SQLite3
             INSERT INTO threads VALUES ('old','Legacy','/b',0), ('archived','Archived','/b',1);
             """)
         let inputs = try [catalog, legacy].map { try Data(contentsOf: $0) }
-        let atoms: JSONObject = ["app-server-pinned-thread-order-v1": ["one", "missing", "old", "one", "archived"],
-                                 "unified-sidebar-project-order-v1": ["codex:project:b", "codex:project:a"]]
+        let pinClient = "client-new-thread:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        let flyingClient = "client-new-thread:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        let foreignClient = "client-new-thread:cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        let unboundClient = "client-new-thread:dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+        let pendingPin = "codex:thread:local:missing"
+        let pendingSectionThread = "codex:thread:local:custom-missing"
+        let archivedThread = "codex:thread:local:archived"
+        let atoms: JSONObject = ["app-server-pinned-thread-order-v1": [pinClient, "missing", "old", "one", "archived", "assigned", unboundClient],
+                                 "unified-sidebar-project-order-v1": ["codex:project:b", "codex:project:a"],
+                                 "client-thread-bindings-v1": [pinClient: "one", flyingClient: "01a202f7",
+                                                               "client-new-thread:invalid": true, "unknown": "old"]]
+        var other = atoms
+        other["client-thread-bindings-v1"] = [pinClient: "other-account", foreignClient: "other-account"]
         let stateFile = root.appendingPathComponent(".codex-global-state.json")
-        var global: JSONObject = ["electron-owner-atoms:account_1": atoms, "electron-owner-atoms:other": atoms,
+        var global: JSONObject = ["electron-owner-atoms:account_1": atoms, "electron-owner-atoms:other": other,
                                   "electron-renderer-content-owner": "account_1",
                                   "sidebar-custom-sections-v3": [
                                     "account_1": [["id": "flying", "name": "Flying",
-                                                   "itemKeys": ["codex:thread:local:01a202f7", "codex:project:d0b14761"]]],
+                                                   "itemKeys": ["codex:thread:local:" + flyingClient, "codex:project:d0b14761",
+                                                                "codex:thread:local:01a202f7", pendingSectionThread, archivedThread]]],
                                     "other": [["id": "private", "name": "Other account", "itemKeys": ["codex:project:missing"]]],
                                   ],
                                   "local-projects": ["a": ["rootPaths": ["/a"]], "b": ["rootPaths": ["/b"]]],
+                                  "thread-project-assignments": ["assigned": ["projectId": "native-a"],
+                                                                 "archived": ["projectId": "b"]],
                                   "app-server-project-id-by-legacy-project-id-by-host": ["local": ["a": "native-a"]]]
         try writeJSONObject(global, to: stateFile)
         try writeJSONObject(["language": "ja"], to: settings)
         let service = PrismService(codexRoot: root, dataDirectory: data)
         let snap = try await service.snapshot()
+        try check(snap["clientBindings"] as? [String: String] == [pinClient: "one", flyingClient: "01a202f7"],
+                  "Client thread bindings must come from the current account")
         let rows = snap["threads"] as? [JSONObject] ?? []
-        try check(rows.compactMap { $0["nativeIndex"] as? Int } == [1, 3], "Pinned order or archived filtering changed")
-        try check(rows.compactMap { $0["projectId"] as? String } == ["a", "b"], "Legacy project mapping changed")
+        try check(rows.compactMap { $0["nativeIndex"] as? Int } == [1, 2, 3, 5, 6], "Pinned order or archived filtering changed")
+        try check(rows.compactMap { $0["projectId"] as? String } == ["a", "b", "a"], "Legacy project mapping changed")
+        try check(rows.first(where: { $0["id"] as? String == "assigned" })?["pending"] as? Bool == true &&
+                  (snap["threadProjects"] as? JSONObject)?["codex:thread:local:assigned"] as? String == "a",
+                  "Pin with an assignment and no database title was omitted")
+        let missing = rows.first(where: { $0["id"] as? String == "missing" })
+        try check(missing?["pending"] as? Bool == true && missing?["projectId"] is NSNull,
+                  "Pin with no database row or assignment must remain pending")
         try check(!FileManager.default.fileExists(atPath: preferences.path), "Snapshot wrote the preference file")
         try check(snap["language"] as? String == "ja", "Language was not read from app-state.json")
         let _ = try await service.update(account: "account_1", operation: ["type": "color", "key": "project:a",
@@ -67,7 +92,7 @@ import SQLite3
         let sections = snap["customSections"] as? [JSONObject] ?? []
         let threadKey = "codex:thread:local:01a202f7"
         try check(sections.count == 1 && sections.first?["name"] as? String == "Flying" &&
-                  sections.first?["threadKeys"] as? [String] == [threadKey] &&
+                  sections.first?["threadKeys"] as? [String] == [threadKey, pendingSectionThread, archivedThread] &&
                   sections.first?["projectKeys"] as? [String] == ["codex:project:d0b14761"], "Wrong account's custom sections")
         let custom = (snap["customThreads"] as? [JSONObject])?.first
         try check(custom?["title"] as? String == "Flying chat" && custom?["projectId"] as? String == "d0b14761",
@@ -78,9 +103,14 @@ import SQLite3
             "key": threadKey, "source": "project", "value": NSNull()])
         try check((edited["threadProjects"] as? JSONObject)?[threadKey] as? String == "d0b14761", "Unpinned inheritance lost")
         _ = try await service.update(account: "account_1", operation: ["type": "color", "key": threadKey, "value": "#408A70"])
+        for (key, color) in [(pendingPin, "#89ABCD"), (pendingSectionThread, "#123456")] {
+            _ = try await service.update(account: "account_1", operation: ["type": "color", "key": key, "value": color])
+        }
         let reopened = try await PrismService(codexRoot: root, dataDirectory: data).snapshot()
         let restored = (reopened["preferences"] as? JSONObject)?["colors"] as? [String: String]
         try check(restored?[threadKey] == "#408A70" && restored?["project:d0b14761"] == "#118ACC", "Custom colors did not persist")
+        try check(restored?[pendingPin] == "#89ABCD" && restored?[pendingSectionThread] == "#123456",
+                  "Color for a pin or custom section thread without a database row did not persist")
         async let first = service.update(account: "account_1", operation: ["type": "preset-color", "slot": 0, "value": "#abcdef"])
         async let second = service.update(account: "account_1", operation: ["type": "mode", "value": "project"])
         _ = try await (first, second)
@@ -92,6 +122,13 @@ import SQLite3
         let before = try Data(contentsOf: preferences)
         try await rejected { _ = try await service.update(account: "other", operation: ["type": "mode", "value": "all"]) }
         try await rejected { _ = try await service.update(account: "account_1", operation: ["type": "color", "key": "project:missing", "value": NSNull()]) }
+        for (key, message) in [("codex:thread:local:" + unboundClient, "会话尚未同步完成"),
+                               (archivedThread, "会话不在当前排行榜"),
+                               ("codex:thread:local:outside", "会话不在当前排行榜")] {
+            try await rejected(message) {
+                _ = try await service.update(account: "account_1", operation: ["type": "color", "key": key, "value": "#FFD059"])
+            }
+        }
         global["electron-renderer-content-owner"] = "unknown"
         try writeJSONObject(global, to: stateFile)
         try await rejected { _ = try await service.snapshot() }

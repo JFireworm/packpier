@@ -165,57 +165,62 @@ if __name__ == "__main__":
         assert all(p.read_bytes() == content for p, content in baseline.items())
         print("PASS upgrade reports shipped builtin versions and preserves all existing JSON")
 
-    with TemporaryDirectory(prefix="packpier-background-upgrade-") as tmp:
-        home = Path(tmp)
-        store = home / "library"
-        contents = root / "build/Packpier.app/Contents"
-        bundles = contents / "Resources/BundledPlugins"
-        order = ["prism", "custom-background", "p-sign"]
-        background = "custom-background"
-        installed = store / "packages" / "renamed-background-folder"
-        previous = {"name": background, "version": "1.3.18", "packpier": {"apiVersion": 3}}
-        for name in order:
-            path = installed if name == background else store / "packages" / name
-            path.mkdir(parents=True)
-            manifest = previous if name == background else json.loads((bundles / name / "package.json").read_bytes())
-            (path / "package.json").write_text(json.dumps(manifest))
-        (installed / "old-source.js").write_text("// 1.3.18 renderer")
-        (store / "Backups").mkdir()
+    upgrades = [
+        ("custom-background", "1.3.18", "1.3.19", "src/thread-clipping.js"),
+        ("prism", "0.1.11", "0.1.13", "renderer.js"),
+        ("prism", "0.1.12", "0.1.13", "renderer.js"),
+    ]
+    for plugin, old_version, new_version, source_file in upgrades:
+        with TemporaryDirectory(prefix="packpier-builtin-upgrade-") as tmp:
+            home = Path(tmp)
+            store = home / "library"
+            contents = root / "build/Packpier.app/Contents"
+            bundles = contents / "Resources/BundledPlugins"
+            order = ["prism", "custom-background", "p-sign"]
+            installed = store / "packages" / ("renamed-" + plugin)
+            previous = {"name": plugin, "version": old_version, "packpier": {"apiVersion": 3}}
+            for name in order:
+                path = installed if name == plugin else store / "packages" / name
+                path.mkdir(parents=True)
+                manifest = previous if name == plugin else json.loads((bundles / name / "package.json").read_bytes())
+                (path / "package.json").write_text(json.dumps(manifest))
+            (installed / "old-source.js").write_text(f"// {old_version} renderer")
+            (store / "Backups").mkdir()
 
-        disabled = [background]
-        user_files = {
-            store / "app-state.json": {"enabled": False, "disabledPackageIDs": disabled, "knownPackageIDs": order},
-            store / "package-settings.json": {"packages": {
-                name: {"priorityOverride": index * 16} for index, name in enumerate(order)
-            }},
-            store / "node-data/2f4e9f248cb97922/preferences-fixture.json": {"colors": {"project:test": "#4287F5"}},
-            installed / "local.json": {"preserveInBackup": True},
-        }
-        for path, value in user_files.items():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(value, ensure_ascii=False, indent=2))
-        local = user_files.pop(installed / "local.json")
-        original = {path.name: path.read_bytes() for path in installed.iterdir()}
-        originals = {path: path.read_bytes() for path in user_files}
-        favorite = home / "Pictures/Packpier/收藏/fixture.png"
-        favorite.parent.mkdir(parents=True)
-        favorite.write_bytes(b"fixture image")
-        request = {"id": 1, "method": "initialize", "params": {
-            "libraryDirectory": str(store), "bundledPackagesDirectory": str(bundles)}}
-        for _ in range(2):
-            raw = subprocess.run([contents / "Helpers/packpier-codex-loader"],
-                                 input=json.dumps(request) + "\n", text=True, capture_output=True, timeout=8, check=True,
-                                 env={**os.environ, "HOME": tmp, "CFFIXED_USER_HOME": tmp})
-            reply = next(msg for msg in map(json.loads, raw.stdout.splitlines()) if msg.get("id") == 1)
-            assert ids(reply) == order and reply["result"]["disabledPackageIDs"] == disabled
-            row = next(row for row in reply["result"]["packages"] if row["id"] == background)
-            assert row["manifest"]["version"] == row["activeBuild"]["version"] == "1.3.19"
-            assert json.loads((installed / "package.json").read_bytes())["version"] == "1.3.19"
-            assert (installed / "src/thread-clipping.js").read_bytes() == (bundles / background / "src/thread-clipping.js").read_bytes()
-            backup, = (store / "Backups").iterdir()
-            assert backup.name.startswith(background + "-1.3.18-")
-            assert {path.name: path.read_bytes() for path in backup.iterdir()} == original
-            assert json.loads((backup / "local.json").read_bytes()) == local
-            assert all(path.read_bytes() == data for path, data in originals.items())
-            assert favorite.read_bytes() == b"fixture image"
-    print("PASS packaged loader migrates background 1.3.18 -> 1.3.19 once and preserves packages, settings and favorites")
+            disabled = [plugin]
+            user_files = {
+                store / "app-state.json": {"enabled": False, "disabledPackageIDs": disabled, "knownPackageIDs": order},
+                store / "package-settings.json": {"packages": {
+                    name: {"priorityOverride": index * 16} for index, name in enumerate(order)
+                }},
+                store / "node-data/2f4e9f248cb97922/preferences-fixture.json": {"colors": {"project:test": "#4287F5"}},
+                installed / "local.json": {"preserveInBackup": True},
+            }
+            for path, value in user_files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(value, ensure_ascii=False, indent=2))
+            local = user_files.pop(installed / "local.json")
+            original = {path.name: path.read_bytes() for path in installed.iterdir()}
+            originals = {path: path.read_bytes() for path in user_files}
+            favorite = home / "Pictures/Packpier/收藏/fixture.png"
+            favorite.parent.mkdir(parents=True)
+            favorite.write_bytes(b"fixture image")
+            request = {"id": 1, "method": "initialize", "params": {
+                "libraryDirectory": str(store), "bundledPackagesDirectory": str(bundles)}}
+            for _ in range(2):
+                raw = subprocess.run([contents / "Helpers/packpier-codex-loader"],
+                                     input=json.dumps(request) + "\n", text=True, capture_output=True, timeout=8, check=True,
+                                     env={**os.environ, "HOME": tmp, "CFFIXED_USER_HOME": tmp})
+                reply = next(msg for msg in map(json.loads, raw.stdout.splitlines()) if msg.get("id") == 1)
+                assert ids(reply) == order and reply["result"]["disabledPackageIDs"] == disabled
+                row = next(row for row in reply["result"]["packages"] if row["id"] == plugin)
+                assert row["manifest"]["version"] == row["activeBuild"]["version"] == new_version
+                assert json.loads((installed / "package.json").read_bytes())["version"] == new_version
+                assert (installed / source_file).read_bytes() == (bundles / plugin / source_file).read_bytes()
+                backup, = (store / "Backups").iterdir()
+                assert backup.name.startswith(f"{plugin}-{old_version}-")
+                assert {path.name: path.read_bytes() for path in backup.iterdir()} == original
+                assert json.loads((backup / "local.json").read_bytes()) == local
+                assert all(path.read_bytes() == data for path, data in originals.items())
+                assert favorite.read_bytes() == b"fixture image"
+        print(f"PASS packaged loader migrates {plugin} {old_version} -> {new_version} once and preserves packages, settings and favorites")

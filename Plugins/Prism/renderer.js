@@ -15,6 +15,9 @@ function resolveLanguage(preference, preferred = []) {
 }
 
 var strings = {
+  "\u4F1A\u8BDD\u540C\u6B65\u4E2D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5": ["Chat is syncing. Try again in a moment.", "\u6703\u8A71\u540C\u6B65\u4E2D\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66", "\u30C1\u30E3\u30C3\u30C8\u3092\u540C\u671F\u4E2D\u3067\u3059\u3002\u3057\u3070\u3089\u304F\u3057\u3066\u304B\u3089\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "\uCC44\uD305\uC744 \uB3D9\uAE30\uD654\uD558\uB294 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694."],
+  "\u4F1A\u8BDD\u5C1A\u672A\u540C\u6B65\u5B8C\u6210": ["Chat has not finished syncing.", "\u6703\u8A71\u5C1A\u672A\u540C\u6B65\u5B8C\u6210", "\u30C1\u30E3\u30C3\u30C8\u306E\u540C\u671F\u304C\u5B8C\u4E86\u3057\u3066\u3044\u307E\u305B\u3093\u3002", "\uCC44\uD305 \uB3D9\uAE30\uD654\uAC00 \uC544\uC9C1 \uC644\uB8CC\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4."],
+  "\u4F1A\u8BDD\u4E0D\u5728\u5F53\u524D\u6392\u884C\u699C": ["Chat is not in the current ranking.", "\u6703\u8A71\u4E0D\u5728\u76EE\u524D\u7684\u6392\u884C\u699C", "\u30C1\u30E3\u30C3\u30C8\u306F\u73FE\u5728\u306E\u30E9\u30F3\u30AD\u30F3\u30B0\u306B\u3042\u308A\u307E\u305B\u3093\u3002", "\uCC44\uD305\uC774 \uD604\uC7AC \uC21C\uC704\uC5D0 \uC5C6\uC2B5\uB2C8\uB2E4."],
   "\u4F1A\u8BDD\u4E3B\u9898\u8272": ["Chat color", "\u6703\u8A71\u4E3B\u984C\u8272", "\u30C1\u30E3\u30C3\u30C8\u306E\u30C6\u30FC\u30DE\u8272", "\uCC44\uD305 \uD14C\uB9C8 \uC0C9\uC0C1"],
   "\u9879\u76EE\u4E3B\u9898\u8272": ["Project color", "\u5C08\u6848\u4E3B\u984C\u8272", "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306E\u30C6\u30FC\u30DE\u8272", "\uD504\uB85C\uC81D\uD2B8 \uD14C\uB9C8 \uC0C9\uC0C1"],
   "\u7EE7\u627F\u9879\u76EE\u8272": ["Use project color", "\u6CBF\u7528\u5C08\u6848\u8272", "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306E\u8272\u3092\u7D99\u627F", "\uD504\uB85C\uC81D\uD2B8 \uC0C9\uC0C1 \uC0AC\uC6A9"],
@@ -137,6 +140,7 @@ var PALETTE = [
   "#A9C1E1"
 ];
 var threadKey = (t2) => `${t2.kind || "codex"}:thread:${t2.hostId || "local"}:${t2.id}`;
+var clientThreadKeyPrefix = "codex:thread:local:client-new-thread:";
 var projectKey = (id) => `project:${id}`;
 function threadColorSource(key, prefs, fallback = "default") {
   return prefs.colors[key] ? "custom" : prefs.threadColorModes?.[key] ?? fallback;
@@ -160,7 +164,7 @@ function groupedThreads(threads, projects, prefs) {
     const buckets = /* @__PURE__ */ new Map();
     for (const t2 of ordered) {
       const id = t2.projectId || "none";
-      if (!buckets.has(id)) buckets.set(id, { id, name: byId.get(id)?.name || "\u672A\u5F52\u5C5E\u9879\u76EE", threads: [] });
+      if (!buckets.has(id)) buckets.set(id, { id, name: byId.get(id)?.name || t2.projectId || t("\u672A\u5F52\u5C5E\u9879\u76EE"), threads: [] });
       buckets.get(id).threads.push(t2);
     }
     return [...buckets.values()];
@@ -199,7 +203,7 @@ function applyColorEdit(prefs, op) {
 }
 
 // native/sidebar.mjs
-function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, threadProjects = {}, threadColorModes = {}, layoutRows, projectColor, chatColor }) {
+function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, threadProjects = {}, threadColorModes = {}, getClientBindings, layoutRows, projectColor, chatColor }) {
   const key = "__prismNativeSidebarV1";
   const sidebar = document.querySelector("[data-sidebar-navigation-root]");
   if (!sidebar) throw new Error("\u627E\u4E0D\u5230\u672C\u673A Codex \u4FA7\u680F\uFF0C\u672A\u5E94\u7528\u6837\u5F0F");
@@ -256,14 +260,15 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
       (row) => row.closest("[data-app-action-sidebar-section]") === section && (row.getClientRects().length > 0 || row.hasAttribute("data-prism-native-filtered"))
     ) : [];
   }
-  function uniqueRows(rows, attribute) {
+  function uniqueThreadRows(rows, bindings) {
     const seen = /* @__PURE__ */ new Set();
     const unique = [];
     for (const row of rows) {
-      const id = row.getAttribute(attribute);
-      if (!id) continue;
-      if (seen.has(id)) return [];
-      seen.add(id);
+      const thread = readThread(row, bindings);
+      if (!thread.id) continue;
+      const key = threadKey(thread);
+      if (seen.has(key)) return [];
+      seen.add(key);
       unique.push(row);
     }
     return unique;
@@ -278,21 +283,22 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
   }
   function paint2() {
     const { pins, sections } = getSections();
-    const pinRows = uniqueRows(ownRows(pins, `[${rowAttribute}][${threadAttribute}][data-app-action-sidebar-thread-pinned="true"]`), threadAttribute);
+    const bindings = getClientBindings?.();
+    const pinRows = uniqueThreadRows(ownRows(pins, `${threadRow}[data-app-action-sidebar-thread-pinned="true"]`), bindings);
     const desiredRows = mode === "smoke" ? pinRows.slice(0, 1) : pinRows;
     const layout = layoutRows?.(pinRows, pins);
     for (const existing of selectedRows) if (!desiredRows.includes(existing)) clearRow(existing);
     for (const [index, row] of desiredRows.entries()) {
-      const rawId = row.getAttribute(threadAttribute);
-      const host = row.getAttribute("data-app-action-sidebar-thread-host-id") || "local";
-      const rowKind = row.getAttribute("data-app-action-sidebar-thread-kind");
-      const id = rowKind === "local" ? rawId.replace(/^local:/, "") : rawId;
-      const kind = !rowKind || rowKind === "local" ? "codex" : rowKind;
-      const preferenceKey = `${kind}:thread:${host}:${id}`;
-      const projectId2 = Object.hasOwn(threadProjects, id) ? threadProjects[id] : null;
+      if (layout?.pending.has(row)) {
+        if (selectedRows.has(row)) clearRow(row);
+        continue;
+      }
+      const thread = readThread(row, bindings);
+      const preferenceKey = threadKey(thread);
+      const projectId2 = threadProjects[preferenceKey] ?? null;
       const own = colors[preferenceKey];
       const inherited = projectId2 && threadColorModes[preferenceKey] === "project" && colors[`project:${projectId2}`];
-      const entry = layout?.get(row);
+      const entry = layout?.rows.get(row);
       const color = entry ? entry.color : own ?? inherited;
       const rank = entry?.rank ?? index + 1;
       const count = entry?.total ?? pinRows.length;
@@ -318,7 +324,7 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
     }
     if (chatColor && mode !== "smoke") {
       const visible = new Set(expanded.flatMap(section => ownRows(section, threadRow)).filter((row) => {
-        const thread = readThread(row);
+        const thread = readThread(row, bindings);
         return !selectedRows.has(row) && thread.id && thread.kind === "codex" && thread.hostId === "local";
       }));
       for (const row of chatRows) if (!visible.has(row)) clearChat(row);
@@ -423,17 +429,17 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
   return status();
 }
 
-function readThread(row) {
+function readThread(row, clientBindings) {
   const attr = (name) => row.getAttribute("data-app-action-sidebar-thread-" + name);
   const rawId = attr("id") || "";
   const kind = attr("kind") || "local";
   const hostId = attr("host-id") || "local";
   const local = hostId === "local" && (kind === "local" || kind === "codex");
-  return {
-    id: local ? rawId.replace(/^(?:codex:thread:)?local:/, "") : rawId,
-    kind: kind === "local" ? "codex" : kind,
-    hostId
-  };
+  const id = local ? rawId.replace(/^(?:codex:thread:)?local:/, "") : rawId;
+  // Codex can retain its client ID in the DOM after the conversation has a server ID.
+  const binding = (key) => Object.hasOwn(clientBindings, key) ? clientBindings[key] : undefined;
+  const resolved = local && clientBindings ? binding(id) || binding(rawId) || id : id;
+  return { id: resolved, kind: kind === "local" ? "codex" : kind, hostId };
 }
 function projectId(row, state) {
   if (row.hasAttribute("data-prism-group-project")) return row.dataset.prismGroupProject;
@@ -443,8 +449,10 @@ function projectId(row, state) {
   return state.projectAliases?.[id] ?? id;
 }
 function chatTint(row, state) {
-  const thread = readThread(row);
-  thread.projectId = state.threadProjects?.[threadKey(thread)] ?? projectId(row, state);
+  const thread = readThread(row, state.clientBindings);
+  const key = threadKey(thread);
+  if (key.startsWith(clientThreadKeyPrefix)) return null;
+  thread.projectId = state.threadProjects?.[key] ?? projectId(row, state);
   return colorFor(thread, state.preferences);
 }
 function projectTint(row, state) {
@@ -453,12 +461,20 @@ function projectTint(row, state) {
 }
 function makeLayout(rows, state) {
   const catalog = new Map(state.threads.map((t2) => [threadKey(t2), t2]));
-  const visible = rows.map((row) => {
-    const thread = readThread(row);
-    return catalog.get(threadKey(thread)) ?? thread;
-  });
-  const subset = visible.length < state.threads.length && visible.every((t2, i) => t2.nativeIndex != null && (i === 0 || t2.nativeIndex > visible[i - 1].nativeIndex));
-  const ordered = subset ? state.threads : visible;
+  const resolved = new Map();
+  const pending = new Set();
+  for (const row of rows) {
+    const thread = readThread(row, state.clientBindings);
+    const key = threadKey(thread);
+    const known = catalog.get(key);
+    const projectId = known?.projectId ?? state.threadProjects?.[key];
+    if ((!known || known.pending) && !projectId) pending.add(row);
+    else resolved.set(row, { ...(known ?? thread), projectId });
+  }
+  const visible = [...resolved.values()];
+  const ranked = state.threads.filter(thread => !thread.pending || thread.projectId || state.threadProjects?.[threadKey(thread)]);
+  const subset = visible.length < ranked.length && visible.every((t2, i) => t2.nativeIndex != null && (i === 0 || t2.nativeIndex > visible[i - 1].nativeIndex));
+  const ordered = subset ? ranked : visible;
   const prefs = { ...state.preferences, order: [] };
   const groups = groupedThreads(visible, state.projects, prefs);
   const positions = new Map(ordered.map((thread, i) => [threadKey(thread), {
@@ -469,7 +485,7 @@ function makeLayout(rows, state) {
   for (const group of groups) {
     for (const thread of group.threads) positions.get(threadKey(thread)).groupId = group.id;
   }
-  return { groups, rows: new Map(rows.map((row, i) => [row, positions.get(threadKey(visible[i]))])) };
+  return { groups, rows: new Map([...resolved].map(([row, thread]) => [row, positions.get(threadKey(thread))])), pending };
 }
 
 function el(tag, text) {
@@ -819,7 +835,7 @@ function createColorEditor({ initial, palette = PALETTE, apply, place, savePrese
   };
 }
 
-function mountPicker({ panel, isProject, key, getPreferences, effectiveColor, save, report, place }) {
+function mountPicker({ panel, isProject, getKey, getPreferences, effectiveColor, save, report, clearNotice, place }) {
   const heading = panel.querySelector(".prism-pop-heading");
   const title = heading.querySelector("strong");
   const originalTitle = isProject ? "\u9879\u76EE\u4E3B\u9898\u8272" : "\u4F1A\u8BDD\u4E3B\u9898\u8272";
@@ -853,6 +869,12 @@ function mountPicker({ panel, isProject, key, getPreferences, effectiveColor, sa
   panel.append(library);
   let editor, previousHistory;
   async function apply(value, source) {
+    const key = getKey();
+    if (key.startsWith(clientThreadKeyPrefix)) {
+      report("\u4F1A\u8BDD\u540C\u6B65\u4E2D\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+      return;
+    }
+    clearNotice();
     if (editor) back();
     try {
       await save({ type: "color", key, value, source });
@@ -877,7 +899,7 @@ function mountPicker({ panel, isProject, key, getPreferences, effectiveColor, sa
   function openEditor() {
     const prefs = getPreferences();
     editor = createColorEditor({
-      initial: prefs.colors[key] || effectiveColor() || prefs.recentColors[0] || "#38C9AE",
+      initial: prefs.colors[getKey()] || effectiveColor() || prefs.recentColors[0] || "#38C9AE",
       palette: prefs.presetColors,
       apply,
       place,
@@ -910,6 +932,7 @@ function mountPicker({ panel, isProject, key, getPreferences, effectiveColor, sa
         (next || add).focus({ preventScroll: true });
       }
     }
+    const key = getKey();
     markSwatches(library, prefs.colors[key]);
     const source = threadColorSource(key, prefs);
     reset.setAttribute("aria-pressed", String(isProject ? !prefs.colors[key] : source === "default"));
@@ -969,6 +992,45 @@ var modes = [
   ["project", "\u6309\u9879\u76EE\u805A\u5408", "m2 7 8-5 8 5-8 5zM2 11l8 5 8-5"]
 ];
 var paletteRows = "[data-prism-native-rank],[data-prism-native-project],[data-prism-chat],[data-prism-group-project]";
+const paletteDotSize = 22;
+const rowActionSelector = "button,[data-interactive-row-button],[role=button]";
+
+function paletteInlineStart(row, bounds, rtl) {
+  const inlineStart = (box) => rtl ? bounds.right - box.right : box.left - bounds.left;
+  const inlineEnd = (box) => rtl ? bounds.right - box.left : box.right - bounds.left;
+  const title = row.querySelector("[data-thread-title],.prism-group-toggle span") ?? row.querySelector("[data-thread-title-trigger]");
+  const titleBox = title?.getBoundingClientRect();
+  const range = document.createRange();
+  const walker = document.createTreeWalker(title ?? row, NodeFilter.SHOW_TEXT);
+  let textStart = Infinity, textEnd = 0;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parent = node.parentElement;
+    const control = parent.closest(rowActionSelector);
+    if (!node.data.trim() || parent.closest(".sr-only,.prism-dot") || (!title && control && control !== row)) continue;
+    range.selectNodeContents(node);
+    const box = range.getBoundingClientRect();
+    if (!box.width || !box.height || getComputedStyle(parent).visibility !== "visible") continue;
+    textStart = Math.min(textStart, inlineStart(box));
+    textEnd = Math.max(textEnd, inlineEnd(box));
+  }
+  if (title && getComputedStyle(title).overflowX !== "visible") textEnd = Math.min(textEnd, inlineEnd(titleBox));
+  const titleStart = Math.max(0, titleBox ? inlineStart(titleBox) : Number.isFinite(textStart) ? textStart : bounds.width / 2);
+  let actionStart = Infinity;
+  for (const button of row.querySelectorAll(rowActionSelector)) {
+    // Codex uses this same marker on the title button. It is not a trailing action.
+    if (button.closest(".prism-dot,.sr-only,[hidden]") || (title && (button.contains(title) || title.contains(button)))) continue;
+    const box = button.getBoundingClientRect();
+    const start = inlineStart(box);
+    if (!box.width || !box.height || start < titleStart - 1 || inlineEnd(box) > bounds.width + 1 ||
+        box.bottom <= bounds.top || box.top >= bounds.bottom || getComputedStyle(button).visibility !== "visible") continue;
+    actionStart = Math.min(actionStart, start);
+  }
+  const limit = Math.min(actionStart, bounds.width);
+  const gap = Number.isFinite(actionStart) ? 6 : 30;
+  const start = Math.max(0, Math.floor(limit - gap - paletteDotSize));
+  return bounds.height >= paletteDotSize && start >= textEnd && start + paletteDotSize + gap <= limit ? start : null;
+}
+
 function createControls({ root, getState, save, signal }) {
   const toolbar = el("div");
   toolbar.className = "prism-tools";
@@ -1001,8 +1063,13 @@ function createControls({ root, getState, save, signal }) {
   notice.className = "prism-error";
   notice.setAttribute("role", "status");
   let anchor, panelTarget, activeRow, messageTimer, picker;
+  const rowResize = new ResizeObserver(place);
   root.append(paletteButton, panel, notice);
   panel.hidden = paletteButton.hidden = notice.hidden = true;
+  function clearNotice() {
+    clearTimeout(messageTimer);
+    notice.hidden = true;
+  }
   function report(message) {
     bind(notice, message);
     notice.hidden = false;
@@ -1024,17 +1091,26 @@ function createControls({ root, getState, save, signal }) {
   }
   function place() {
     if (activeRow?.isConnected && activeRow.getClientRects().length) {
-      const r2 = activeRow.getBoundingClientRect();
-      const actions = [...activeRow.querySelectorAll("button:not([data-interactive-row-button]):not(.sr-only):not(.prism-dot)")].map((item) => item.getBoundingClientRect()).filter((box) => box.width >= 12 && box.left >= r2.left + r2.width / 2 && box.right <= r2.right + 1);
-      const end = Math.min(r2.right, ...actions.map((box) => box.left));
-      const nested = paletteButton.parentNode === activeRow;
-      paletteButton.style.left = Math.round(Math.max(r2.left, end - 24) - (nested ? r2.left : 0)) + "px";
-      paletteButton.style.top = Math.round((nested ? 0 : r2.top) + (r2.height - 22) / 2) + "px";
-      paletteButton.style.setProperty("--prism-swatch", activeRow.style.getPropertyValue("--prism-native-color") || activeRow.style.getPropertyValue("--prism-project-color") || "transparent");
+      const bounds = activeRow.getBoundingClientRect();
+      const style = getComputedStyle(activeRow);
+      const rtl = style.direction === "rtl";
+      const start = paletteInlineStart(activeRow, bounds, rtl);
+      paletteButton.hidden = start === null;
+      if (start !== null) {
+        const nested = paletteButton.parentNode === activeRow;
+        const viewportStart = rtl ? document.documentElement.clientWidth - bounds.right : bounds.left;
+        const inlineOrigin = nested ? -parseFloat(style.borderInlineStartWidth) : viewportStart;
+        const blockOrigin = nested ? -parseFloat(style.borderTopWidth) : bounds.top;
+        paletteButton.style.direction = style.direction;
+        paletteButton.style.insetInlineStart = (inlineOrigin + start) + "px";
+        paletteButton.style.top = (blockOrigin + (bounds.height - paletteDotSize) / 2) + "px";
+        paletteButton.style.setProperty("--prism-swatch", activeRow.style.getPropertyValue("--prism-native-color") || activeRow.style.getPropertyValue("--prism-project-color") || "transparent");
+      }
     } else if (!paletteButton.hidden) paletteButton.hidden = true;
     if (panel.hidden) return;
-    if (!anchor?.isConnected || !anchor.getClientRects().length || panelTarget && !panelTarget.getClientRects().length) return close();
-    const r = anchor.getBoundingClientRect();
+    const reference = anchor === paletteButton && paletteButton.hidden ? panelTarget : anchor;
+    if (!reference?.isConnected || !reference.getClientRects().length || panelTarget && !panelTarget.getClientRects().length) return close();
+    const r = reference.getBoundingClientRect();
     const sidebar = (panelTarget || anchor).closest("[data-sidebar-navigation-root]")?.getBoundingClientRect();
     const left = sidebar && sidebar.width >= panel.offsetWidth + 12 ? sidebar.left + 6 : 6;
     const right = sidebar && sidebar.width >= panel.offsetWidth + 12 ? sidebar.right - 6 : innerWidth - 6;
@@ -1099,19 +1175,23 @@ function createControls({ root, getState, save, signal }) {
     finishPanel(checked);
   }
   function openPicker() {
-    const state = getState();
-    if (!activeRow?.isConnected || !state) return;
-    const isProject = activeRow.matches("[data-prism-native-project],[data-prism-group-project]");
-    const key = isProject ? projectKey(projectId(activeRow, state)) : threadKey(readThread(activeRow));
-    show(paletteButton, isProject ? "\u9879\u76EE\u4E3B\u9898\u8272" : "\u4F1A\u8BDD\u4E3B\u9898\u8272", "color", activeRow);
+    const row = activeRow;
+    if (!row?.isConnected || !getState()) return;
+    const isProject = row.matches("[data-prism-native-project],[data-prism-group-project]");
+    const getKey = () => {
+      const state = getState();
+      return isProject ? projectKey(projectId(row, state)) : threadKey(readThread(row, state.clientBindings));
+    };
+    show(paletteButton, isProject ? "\u9879\u76EE\u4E3B\u9898\u8272" : "\u4F1A\u8BDD\u4E3B\u9898\u8272", "color", row);
     picker = mountPicker({
       panel,
       isProject,
-      key,
+      getKey,
       getPreferences: () => getState().preferences,
-      effectiveColor: () => activeRow?.style.getPropertyValue("--prism-native-color"),
+      effectiveColor: () => row.style.getPropertyValue("--prism-native-color"),
       save,
       report,
+      clearNotice,
       place
     });
     finishPanel(panel.querySelector("[aria-pressed=true]") || panel.querySelector(".prism-swatches button"));
@@ -1131,12 +1211,14 @@ function createControls({ root, getState, save, signal }) {
   function identify(event) {
     if (!(event.target instanceof Element) || panel.contains(event.target) || paletteButton.contains(event.target) || !panel.hidden) return;
     const row = event.target.closest(paletteRows);
-    if (activeRow === row && (row || paletteButton.hidden)) return;
-    activeRow = row;
-    const parent = activeRow && !activeRow.matches("button,a") ? activeRow : root;
-    if (paletteButton.parentNode !== parent) parent.append(paletteButton);
-    if (paletteButton.hidden !== !activeRow) paletteButton.hidden = !activeRow;
-    if (activeRow) place();
+    if (activeRow !== row) {
+      rowResize.disconnect();
+      activeRow = row;
+      const parent = row && !row.matches("button,a") ? row : root;
+      if (paletteButton.parentNode !== parent) parent.append(paletteButton);
+      if (row) rowResize.observe(row);
+    }
+    place();
   }
   document.addEventListener("pointerover", identify, { signal });
   document.addEventListener("focusin", identify, { signal });
@@ -1181,6 +1263,7 @@ function createControls({ root, getState, save, signal }) {
     },
     reset() {
       close();
+      rowResize.disconnect();
       toolbar.remove();
       activeRow = null;
       paletteButton.hidden = true;
@@ -1188,6 +1271,7 @@ function createControls({ root, getState, save, signal }) {
     },
     dispose() {
       close();
+      rowResize.disconnect();
       clearTimeout(messageTimer);
       toolbar.remove();
       paletteButton.remove();
@@ -1243,6 +1327,12 @@ function createGroupView(refresh) {
     item.removeAttribute("data-prism-folded");
     item.style.removeProperty("--prism-order");
     items.delete(item);
+  }
+  function leaveNative(rows) {
+    for (const row of rows) {
+      const item = row.closest("[role=listitem]");
+      if (items.has(item)) release(item);
+    }
   }
   function clear() {
     for (const item of items) release(item);
@@ -1341,7 +1431,7 @@ function createGroupView(refresh) {
       if (header.parentNode !== list) list.append(header);
       header.style.order = String(3 * order++);
       toggle.setAttribute("aria-expanded", String(!collapsed.has(group.id)));
-      const name = isProject ? group.name : t("\u672A\u5F52\u5C5E\u9879\u76EE");
+      const name = state.preferences.mode === "project" || isProject ? group.name : t("\u672A\u5F52\u5C5E\u9879\u76EE");
       if (toggle.children[0].textContent !== name) toggle.children[0].textContent = name;
       const count = String(members.length);
       if (toggle.children[1].textContent !== count) toggle.children[1].textContent = count;
@@ -1360,7 +1450,7 @@ function createGroupView(refresh) {
     }
     placeMarker();
   }
-  return { render, clear };
+  return { render, clear, leaveNative };
 }
 
 var style_default = `.prism-tools,.prism-pop,.prism-dot,.prism-error,.prism-group {
@@ -1394,7 +1484,7 @@ var style_default = `.prism-tools,.prism-pop,.prism-dot,.prism-error,.prism-grou
 .prism-dot,.prism-pop,.prism-error {position:fixed;z-index:2147482600;pointer-events:auto}
 [data-prism-native-project],[data-prism-chat],[data-prism-group-project] {position:relative}
 :is([data-prism-native-rank],[data-prism-native-project],[data-prism-chat],[data-prism-group-project])>.prism-dot {position:absolute;z-index:3}
-button.prism-dot {display:grid;place-items:center;width:22px;height:22px;border-radius:5px;padding:0;color:var(--color-text-secondary,CanvasText)}
+button.prism-dot {display:grid;place-items:center;width:${paletteDotSize}px;height:${paletteDotSize}px;border-radius:5px;padding:0;color:var(--color-text-secondary,CanvasText)}
 .prism-dot::before {content:'';width:11px;height:11px;box-sizing:border-box;border-radius:3px;border:1.25px solid currentColor;background:var(--prism-swatch,transparent)}
 .prism-dot[style*="--prism-swatch: transparent"]::before {background:linear-gradient(135deg,transparent 0 50%,currentColor 50%)}
 .prism-pop,.prism-error {
@@ -1484,6 +1574,7 @@ function activate({ node, onCleanup }) {
   document.body.append(portal);
   let state, confirmed, signature, sidebar, appearance, reading, again, failed = false;
   let writes = Promise.resolve(), revision = 0, timer, membership;
+  let pinChange, groupTimer, hasPendingPins = false;
   const pending = /* @__PURE__ */ new Set();
   const origin = crypto.randomUUID();
   const controls = createControls({ root: portal, signal: controller.signal, getState: () => state, save });
@@ -1538,12 +1629,15 @@ function activate({ node, onCleanup }) {
     if (sidebar === next && appearance) return;
     observer.disconnect();
     clearTimeout(timer);
+    clearTimeout(groupTimer);
     groups.clear();
     appearance?.dispose();
     appearance = null;
     controls.reset();
     sidebar = next;
     membership = null;
+    pinChange = null;
+    hasPendingPins = false;
     if (!next) {
       if (!document.hidden) observer.observe(document.body, { childList: true, subtree: true });
       return;
@@ -1554,20 +1648,33 @@ function activate({ node, onCleanup }) {
     mountPrismSidebar({
       mode: "all",
       palette: PALETTE,
+      getClientBindings: () => state?.clientBindings,
       projectColor: (row) => state ? projectTint(row, state) : null,
       chatColor: (row) => state ? chatTint(row, state) : null,
       layoutRows(rows, section) {
-        const keys = rows.map((row) => row.getAttribute("data-app-action-sidebar-thread-id")).join("\n");
+        // This signature tracks the DOM. Resolving a client ID must not start a new refresh window.
+        const keys = rows.map((row) => threadKey(readThread(row))).join("\n");
         if (membership !== null && keys !== membership) {
-          if (reading) again = true;
-          else nextRead(250);
+          pinChange = { at: performance.now(), reads: 0 };
+          clearTimeout(groupTimer);
+          nextRead(250);
         }
         membership = keys;
         if (!state) return;
         const view = makeLayout(rows, state);
-        groups.render(section, view, state);
+        hasPendingPins = view.pending.size > 0;
+        const remaining = pinChange ? pinChange.at + 400 - performance.now() : 0;
+        if (pinChange && (!pinChange.reads || remaining > 0)) {
+          groups.leaveNative(view.pending);
+          if (pinChange.reads) {
+            clearTimeout(groupTimer);
+            groupTimer = setTimeout(() => appearance?.refreshNow(), remaining);
+          }
+        } else {
+          groups.render(section, view, state);
+        }
         controls.updateToolbar(section, state.preferences.mode);
-        return view.rows;
+        return view;
       }
     });
     appearance = window.__prismNativeSidebarV1;
@@ -1578,18 +1685,21 @@ function activate({ node, onCleanup }) {
       again = false;
       try {
         const before = revision;
+        const requestedFor = pinChange;
         const current = await node.invoke("snapshot", {});
         if (controller.signal.aborted) return;
         if (revision !== before) {
           again = true;
           continue;
         }
+        const pinRead = requestedFor && requestedFor === pinChange && requestedFor.reads < 2;
+        if (pinRead) requestedFor.reads++;
         const encoded = JSON.stringify(current);
         if (encoded !== signature) {
           confirmed = current;
           signature = encoded;
           paintState(true);
-        }
+        } else if (pinRead) appearance?.refreshNow();
         failed = false;
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -1613,7 +1723,11 @@ function activate({ node, onCleanup }) {
     clearTimeout(timer);
     reading = read().finally(() => {
       reading = null;
-      if (!controller.signal.aborted) nextRead(failed ? 3e3 : 6e4);
+      if (controller.signal.aborted) return;
+      if (failed) nextRead(3e3);
+      else if (pinChange?.reads === 0) nextRead(Math.max(0, pinChange.at + 250 - performance.now()));
+      else if (pinChange?.reads === 1 && hasPendingPins) nextRead(250);
+      else nextRead();
     });
     return reading;
   }
@@ -1631,6 +1745,7 @@ function activate({ node, onCleanup }) {
   onCleanup(() => {
     controller.abort();
     clearTimeout(timer);
+    clearTimeout(groupTimer);
     unsubscribe();
     observer.disconnect();
     groups.clear();

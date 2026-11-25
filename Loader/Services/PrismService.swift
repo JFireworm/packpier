@@ -111,8 +111,14 @@ actor PrismService {
             prefs["presetColors"] = palette
             return
         }
-        guard let key = op["key"] as? String, editable.contains(key) else { throw WireError.message("条目已移出排行榜，请刷新") }
+        guard let key = op["key"] as? String else { throw WireError.message("无效的侧栏设置") }
         let isProject = key.hasPrefix("project:")
+        guard editable.contains(key) else {
+            throw WireError.message(isProject ? "条目已移出排行榜，请刷新" : "会话不在当前排行榜")
+        }
+        if key.hasPrefix(PrismCatalog.threadPrefix + PrismCatalog.clientThreadPrefix) {
+            throw WireError.message("会话尚未同步完成")
+        }
         let source = op["source"] as? String
         if op["source"] != nil, isProject || color != nil || !["default", "project"].contains(source ?? "") {
             throw WireError.message("无效的颜色来源")

@@ -195,9 +195,82 @@ function checkPSignUpdateButton(rail, sign) {
   check(sign.getBoundingClientRect().top === initialTop, "P-Sign did not return after the update button disappeared");
 }
 
+function checkPalettePlacement() {
+  const fixture = document.createElement("section");
+  fixture.setAttribute("data-app-action-sidebar-section", "");
+  fixture.setAttribute("data-app-action-sidebar-section-heading", "Placement fixture");
+  fixture.innerHTML = `
+    <style>
+      .placement-row {width:240px;border:1px solid transparent;box-sizing:border-box;white-space:nowrap}
+      .placement-title {display:block;width:100%;padding:3px 0;border:0;text-align:start}
+      .placement-actions {display:flex;gap:5px;position:absolute;inset-inline-end:8px;top:3px}
+      .placement-actions button {width:20px;height:20px;padding:0}
+      .placement-ignored {position:absolute;inset-inline-start:65px;top:2px;width:20px;height:20px}
+    </style>
+    <div class="placement-row" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="placement">
+      <div data-thread-title-trigger><button class="placement-title" data-interactive-row-button><span data-thread-title>Chat</span></button></div>
+      <div class="placement-actions">
+        <button data-interactive-row-button aria-label="Archive"></button>
+        <button aria-label="More actions"></button>
+      </div>
+      <button class="placement-ignored sr-only" aria-label="Keyboard action"></button>
+      <button class="placement-ignored" style="visibility:hidden" aria-label="Hidden action"></button>
+    </div>`;
+  document.querySelector("[data-sidebar-navigation-root]").append(fixture);
+  window.__prismNativeSidebarV1.refreshNow();
+  const row = fixture.querySelector(".placement-row");
+  const title = row.querySelector("[data-thread-title]");
+  const actions = row.querySelector(".placement-actions");
+  const hover = () => {
+    title.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    return row.querySelector(".prism-dot");
+  };
+  function checkBounds(dot, rtl = false) {
+    const box = dot.getBoundingClientRect();
+    const bounds = row.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(title);
+    const text = range.getBoundingClientRect();
+    check(!dot.hidden && box.width === 22 && box.left >= bounds.left && box.right <= bounds.right &&
+      box.top >= bounds.top && box.bottom <= bounds.bottom, "Prism dot escaped its row");
+    check(rtl ? box.right <= text.left : box.left >= text.right, "Prism dot overlaps the visible title text");
+    return box;
+  }
+  function checkActions(dot, rtl = false) {
+    const box = checkBounds(dot, rtl);
+    for (const button of actions.querySelectorAll("button")) {
+      const native = button.getBoundingClientRect();
+      check(rtl ? native.right + 6 <= box.left : box.right + 6 <= native.left, "Prism dot overlaps native actions");
+    }
+  }
+  checkActions(hover());
+  row.dir = "rtl";
+  checkActions(hover(), true);
+  row.dir = "ltr";
+  row.style.width = "120px";
+  checkActions(hover());
+  actions.hidden = true;
+  actions.style.display = "none";
+  const fallback = checkBounds(hover());
+  const trailingGap = row.getBoundingClientRect().right - fallback.right;
+  check(trailingGap >= 30 && trailingGap < 31, "An action-free row did not keep its trailing clearance");
+  row.style.width = "92px";
+  title.textContent = "A long title";
+  const narrowDot = hover();
+  check(narrowDot.hidden && !narrowDot.getClientRects().length, "The dot should yield to text when it cannot fit");
+  title.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", altKey: true, bubbles: true }));
+  check(document.querySelector('.prism-pop:not([hidden])[role="dialog"]'), "The narrow row lost keyboard access to the color picker");
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  fixture.remove();
+}
+
 async function run() {
   document.documentElement.lang = "zh-CN";
+  const pinnedClient = "client-new-thread:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const fallbackClient = "client-new-thread:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const flyingClient = "client-new-thread:cccccccc-cccc-4ccc-8ccc-cccccccccccc";
   document.body.innerHTML = `<style>
+      [data-app-action-sidebar-thread-row],[data-app-action-sidebar-project-row] { min-height: 26px; }
       nav[data-app-navigation-rail] { position: fixed; left: 8px; bottom: 4px; width: 36px; }
       .rail-stack { display: flex; flex-direction: column; gap: 8px; }
       .rail-stack button { width: 36px; height: 36px; padding: 0; }
@@ -210,10 +283,12 @@ async function run() {
     <aside data-sidebar-navigation-root><section data-app-action-sidebar-section data-app-action-sidebar-section-heading="Recents">
       <div data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="sample" data-app-action-sidebar-thread-kind="local">Sample chat</div>
     </section><section data-app-action-sidebar-section data-app-action-sidebar-section-heading="Pinned">
-      <h2>Pinned</h2><div data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="pin-one" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="true">First pin</div>
-      <div data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="pin-two" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="true">Second pin</div>
+      <h2>Pinned</h2><div role="list">
+        <div role="listitem"><div id="mapped-pin" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:${pinnedClient}" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="true">First pin</div></div>
+        <div role="listitem"><div id="unmapped-pin" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:${fallbackClient}" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="true">Second pin</div></div>
+      </div>
     </section><section id="flying" data-app-action-sidebar-section data-app-action-sidebar-section-heading="Flying">
-      <div id="flying-chat" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:01a202f7" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="false">Flying chat</div>
+      <div id="flying-chat" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="local:${flyingClient}" data-app-action-sidebar-thread-kind="local" data-app-action-sidebar-thread-pinned="false">Flying chat</div>
       <div id="flying-project" data-app-action-sidebar-project-row data-app-action-sidebar-project-id="codex:project:d0b14761">Flying project</div>
     </section></aside><main></main>`;
   const storageKey = "codex-tweaks:codex-custom-background:v1";
@@ -225,9 +300,24 @@ async function run() {
   let requests = 0;
   const flyingThreadKey = "codex:thread:local:01a202f7";
   const flyingProjectKey = "project:d0b14761";
-  const preferences = { mode: "all", colors: { "codex:thread:local:sample": "#FF79A9",
-    [flyingThreadKey]: "#408A70", [flyingProjectKey]: "#118ACC" }, order: [], recentColors: [],
+  const pinnedKey = "codex:thread:local:pin-one";
+  const fallbackKey = "codex:thread:local:" + fallbackClient;
+  const lateClient = "client-new-thread:dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const unresolvedClient = "client-new-thread:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const lateKey = "codex:thread:local:pin-late";
+  const noDatabaseKey = "codex:thread:local:pin-no-db";
+  const unresolvedKey = "codex:thread:local:" + unresolvedClient;
+  const preferences = { mode: "project", colors: { "codex:thread:local:sample": "#FF79A9",
+    [pinnedKey]: "#5E5EFF", [fallbackKey]: "#A86422", [flyingProjectKey]: "#118ACC",
+    "project:beak-id": "#39856D", [unresolvedKey]: "#8844BB" },
+    threadColorModes: { [flyingThreadKey]: "project" }, order: [], recentColors: [],
     presetColors: Array.from({ length: 16 }, (_, i) => "#" + (0x559900 + i).toString(16)) };
+  const threads = [{ id: "pin-one", projectId: "beak-id", nativeIndex: 1 },
+    { id: fallbackClient, projectId: "field-notes", nativeIndex: 2 },
+    { id: "pin-no-db", projectId: null, nativeIndex: 3, pending: true }];
+  const clientBindings = { [pinnedClient]: "pin-one", ["local:" + flyingClient]: "01a202f7" };
+  const threadProjects = { [pinnedKey]: "beak-id", [flyingThreadKey]: "d0b14761" };
+  let snapshotReads = 0;
   const edits = [];
   const effects = createWindowEffects({
     prismService: {
@@ -236,10 +326,9 @@ async function run() {
         if (method === "update") {
           edits.push(operation);
           preferences.colors[operation.key] = operation.value;
-        }
-        return { account: "test", projects: [], language: "en", preferences,
-          threads: [{ id: "pin-one", nativeIndex: 1 }, { id: "pin-two", nativeIndex: 2 }],
-          threadProjects: { [flyingThreadKey]: "d0b14761" },
+        } else if (method === "snapshot") snapshotReads++;
+        return { account: "test", projects: [{ id: "beak-id", name: "beak" }, { id: "field-notes", name: "Field Notes" }],
+          language: "en", preferences, threads, clientBindings, threadProjects,
           customSections: [{ id: "flying", name: "Flying", threadKeys: [flyingThreadKey],
             projectKeys: ["codex:project:d0b14761"] }] };
       },
@@ -279,14 +368,30 @@ async function run() {
   const pins = () => [...document.querySelectorAll("[data-prism-native-rank]")].map(pin => pin.getAttribute("data-prism-native-rank")).join(",");
   const pinOrder = pins();
   check(pinOrder === "01,02" && document.querySelector(".prism-tools"), "Pinned rank or toolbar missing");
-  check(tint(flyingChat) === "#408A70" && tint(flyingProject) === "#118ACC", "Flying colors missing");
+  const mappedPin = document.querySelector("#mapped-pin");
+  const unmappedPin = document.querySelector("#unmapped-pin");
+  const beak = document.querySelector('[data-prism-group-project="beak-id"]');
+  const orderOf = row => Number(row.closest("[role=listitem]").style.getPropertyValue("--prism-order"));
+  check(beak?.textContent === "beak1" && orderOf(mappedPin) === Number(beak.style.order) + 3,
+    "Mapped pinned row did not join beak");
+  check(unmappedPin.style.getPropertyValue("--prism-native-color") === "#A86422" &&
+    orderOf(unmappedPin) > orderOf(mappedPin) && !unmappedPin.hasAttribute("data-prism-native-filtered"),
+    "Unmapped pinned row did not keep fallback behavior");
+  check(tint(mappedPin) === "#5E5EFF", "Real pinned key did not pick up the saved color");
+  check(tint(flyingChat) === "#118ACC" && tint(flyingProject) === "#118ACC", "Flying inheritance missing");
   check(!flyingChat.hasAttribute("data-prism-native-rank"), "Custom row entered Pinned ranking");
-  for (const [target, key] of [[flyingChat, flyingThreadKey], [flyingProject, flyingProjectKey]]) {
+  function openPalette(target) {
     target.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
     const palette = document.querySelector(".prism-dot:not([hidden])");
-    check(palette, "No palette on " + key);
+    check(palette, "No palette on " + target.textContent);
     palette.click();
-    const firstSwatch = document.querySelector(".prism-swatches button[data-color]");
+    const panel = document.querySelector(".prism-pop:not([hidden])");
+    check(panel, "Palette did not open");
+    return panel;
+  }
+  const swatch = (panel) => panel.querySelector(".prism-swatches button[data-color]");
+  for (const [target, key] of [[mappedPin, pinnedKey], [flyingChat, flyingThreadKey], [flyingProject, flyingProjectKey]]) {
+    const firstSwatch = swatch(openPalette(target));
     check(firstSwatch, "No swatches on " + key);
     firstSwatch.click();
     await new Promise(resolve => setTimeout(resolve, 30));
@@ -300,6 +405,78 @@ async function run() {
   window.__prismNativeSidebarV1.refreshNow();
   check(tint(flyingChat) === preferences.colors[flyingThreadKey] &&
     tint(flyingProject) === preferences.colors[flyingProjectKey] && pins() === pinOrder, "Flying did not restore after reopening");
+
+  const list = mappedPin.closest("[role=list]");
+  const addPin = (id) => {
+    const item = document.createElement("div");
+    item.setAttribute("role", "listitem");
+    const pin = document.createElement("div");
+    pin.setAttribute("data-app-action-sidebar-thread-row", "");
+    pin.setAttribute("data-app-action-sidebar-thread-id", "local:" + id);
+    pin.setAttribute("data-app-action-sidebar-thread-kind", "local");
+    pin.setAttribute("data-app-action-sidebar-thread-pinned", "true");
+    pin.textContent = "New pin";
+    item.append(pin);
+    return item;
+  };
+  const late = addPin(lateClient);
+  const unresolved = addPin(unresolvedClient);
+  const noDatabaseRow = addPin("pin-no-db");
+  list.insertBefore(late, unmappedPin.parentElement);
+  list.insertBefore(unresolved, unmappedPin.parentElement);
+  list.insertBefore(noDatabaseRow, unmappedPin.parentElement);
+  const stillNative = (item) => item.parentElement === list && !item.hasAttribute("data-prism-item") &&
+    !item.style.getPropertyValue("--prism-order") && !item.firstElementChild.hasAttribute("data-prism-native-rank") &&
+    !tint(item.firstElementChild);
+  const placements = new Set();
+  let sawUngrouped = false;
+  const observer = new MutationObserver(() => {
+    sawUngrouped ||= [...list.querySelectorAll(".prism-group-toggle span")]
+      .some(title => ["No project", "未归属项目"].includes(title.textContent));
+    if (late.hasAttribute("data-prism-item")) placements.add(late.style.getPropertyValue("--prism-order"));
+  });
+  observer.observe(list, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "data-prism-item"] });
+  const beforePinReads = snapshotReads;
+  window.__prismNativeSidebarV1.refreshNow();
+  check(stillNative(late) && stillNative(unresolved) && stillNative(noDatabaseRow) && late.nextElementSibling === unresolved &&
+    unresolved.nextElementSibling === noDatabaseRow && noDatabaseRow.nextElementSibling === unmappedPin.parentElement &&
+    beak.textContent === "beak1", "A pending pin left its native position");
+  const pendingEdits = edits.length;
+  const waitingPanel = openPalette(late.firstElementChild);
+  swatch(waitingPanel).click();
+  check(edits.length === pendingEdits && !waitingPanel.hidden &&
+    document.querySelector(".prism-error:not([hidden])")?.textContent === "Chat is syncing. Try again in a moment.",
+    "Unbound pin should keep its palette open and show the syncing notice without an update");
+  await new Promise(resolve => setTimeout(resolve, 340));
+  check(snapshotReads === beforePinReads + 1 && stillNative(late) && stillNative(unresolved) && !sawUngrouped,
+    "The first stale snapshot moved a pending pin");
+  check(edits.length === pendingEdits, "An unbound pin sent an asynchronous update");
+  clientBindings[lateClient] = "pin-late";
+  threads.push({ id: "pin-late", projectId: "beak-id", nativeIndex: 2, pending: true },
+    { id: unresolvedClient, projectId: null, nativeIndex: 4, pending: true });
+  threads[1].nativeIndex = 3;
+  threads[2].nativeIndex = 5;
+  preferences.threadColorModes[lateKey] = "project";
+  await new Promise(resolve => setTimeout(resolve, 470));
+  observer.disconnect();
+  check(snapshotReads === beforePinReads + 2 && !sawUngrouped && stillNative(unresolved) && placements.size === 1 &&
+    [...placements][0] === String(Number(beak.style.order) + 6) && beak.textContent === "beak2",
+    "A delayed binding did not join beak once or an unresolved pin left its native position");
+  check(late.firstElementChild.getAttribute("data-prism-native-rank") === "02" &&
+    tint(late.firstElementChild) === "#39856D" && pins() === "01,02,03", "Resolved pin rank or inherited color is wrong");
+  check(!waitingPanel.hidden, "Syncing closed the open color picker");
+  swatch(waitingPanel).click();
+  await new Promise(resolve => setTimeout(resolve, 30));
+  check(edits.length === pendingEdits + 1 && edits.at(-1)?.key === lateKey && tint(late.firstElementChild) === edits.at(-1)?.value,
+    "Retrying from an open picker must use the newly bound ID");
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  swatch(openPalette(noDatabaseRow.firstElementChild)).click();
+  await new Promise(resolve => setTimeout(resolve, 30));
+  check(edits.at(-1)?.key === noDatabaseKey && tint(noDatabaseRow.firstElementChild) === edits.at(-1)?.value &&
+    !noDatabaseRow.hasAttribute("data-prism-item") && pins() === "01,02,03", "A real pin without a database row could not change color in place");
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  checkPalettePlacement();
+
   const wallpaper = document.querySelector("[data-packpier-cbgp-wallpaper]");
   check(!wallpaper.hidden && wallpaper.style.cssText.includes("first.webp"), "Missing wallpaper");
   const sign = document.querySelector(".packpier-p-sign");

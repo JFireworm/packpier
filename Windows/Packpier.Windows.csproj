@@ -6,8 +6,8 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
-    <Version>0.1.30</Version>
-    <FileVersion>0.1.30.41</FileVersion>
+    <Version>0.1.31</Version>
+    <FileVersion>0.1.31.42</FileVersion>
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>

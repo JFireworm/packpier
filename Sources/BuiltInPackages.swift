@@ -21,9 +21,7 @@ extension BuiltInPackages {
                 guard let old = manifest(destination)?["version"] as? String,
                       let new = shipped["version"] as? String else { continue }
                 let signUpdate = id == sign && old.compare(new, options: .numeric) == .orderedAscending
-                let backgroundRelease = id == background && upgradesBackground(from: old, to: new)
-                let prismUpdate = id == "prism" && old == "0.1.11" && new == "0.1.12"
-                guard signUpdate || prismUpdate || backgroundRelease else { continue }
+                guard signUpdate || upgrades(id, from: old, to: new) else { continue }
             }
             let stage = packages.appendingPathComponent(".packpier-" + UUID().uuidString)
             defer { try? fm.removeItem(at: stage) }

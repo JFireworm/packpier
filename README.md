@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · **English**
 
-Packpier is a native macOS plugin manager for the Codex desktop app. It installs, orders, enables and removes plugins, and mounts their effects directly in a running Codex window. Packpier 0.1.30 uses a Swift host and native services, so the three built-in plugins work without installing Node.js.
+Packpier is a native macOS plugin manager for the Codex desktop app. It installs, orders, enables and removes plugins, and mounts their effects directly in a running Codex window. Packpier 0.1.31 uses a Swift host and native services, so the three built-in plugins work without installing Node.js.
 
 ## Built-in plugins
 
@@ -80,9 +80,9 @@ PACKPIER_ARCH=x86_64 ./Scripts/build.sh
 PACKPIER_ARCH=x86_64 ./Scripts/build-dmg.sh
 ```
 
-The Intel App is staged in `build/x86_64/Packpier.app`. The disk image is `build/Packpier-0.1.30-macOS-x86_64.dmg`. This build uses the same Sparkle framework. The current release feed serves an arm64 update ZIP. Maintainers can enable an Intel-compatible signed feed with `PACKPIER_FEED_URL` and `PACKPIER_PUBLIC_ED_KEY`.
+The Intel App is staged in `build/x86_64/Packpier.app`. The disk image is `build/Packpier-0.1.31-macOS-x86_64.dmg`. This build uses the same Sparkle framework. The current release feed serves an arm64 update ZIP. Maintainers can enable an Intel-compatible signed feed with `PACKPIER_FEED_URL` and `PACKPIER_PUBLIC_ED_KEY`.
 
-Packpier 0.1.30 includes a **Windows x64 preview**. It opens the shared read-only plugin marketplace and shows plugin versions and descriptions. Codex integration, plugin installation and enablement are available on macOS. See the [Windows run instructions](Windows/README.md) and [porting plan](docs/windows-port.md).
+Packpier 0.1.31 includes a **Windows x64 preview**. It opens the shared read-only plugin marketplace and shows plugin versions and descriptions. Codex integration, plugin installation and enablement are available on macOS. See the [Windows run instructions](Windows/README.md) and [porting plan](docs/windows-port.md).
 
 `make lint` checks source and distribution files. `make unit` and `make integration` run the test suites. Plugin sources live in [Prism](Plugins/Prism), [Custom Background](Plugins/CustomBackground) and [P-Sign](Resources/BundledPlugins/p-sign). After editing a plugin, run `python3 Scripts/plugin-archives.py` to refresh its marketplace archive.
 

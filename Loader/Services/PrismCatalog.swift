@@ -51,11 +51,13 @@ private final class ThreadLookup {
 
 struct PrismCatalog {
     static let threadPrefix = "codex:thread:local:"
+    static let clientThreadPrefix = "client-new-thread:"
     static let projectPrefix = "codex:project:"
     let account: String
     let projects: [[String: String]]
     let aliases: [String: String]
     private let pins: [String]
+    private let clientBindings: [String: String]
     private let assignments: [String: [String: String]]
     private let customSections: [CustomSection]
     private let catalog: ThreadLookup
@@ -87,8 +89,13 @@ struct PrismCatalog {
         guard let pinned = atoms["app-server-pinned-thread-order-v1"] as? [String] else {
             throw WireError.message("当前 Codex 置顶数据格式不受支持")
         }
+        let clientPrefix = Self.clientThreadPrefix
+        let bindings = (atoms["client-thread-bindings-v1"] as? JSONObject ?? [:])
+            .filter { $0.key.hasPrefix(clientPrefix) && $0.key.count > clientPrefix.count }
+            .compactMapValues { ($0 as? String).flatMap { $0.isEmpty ? nil : $0 } }
+        clientBindings = bindings
         var seen: Set<String> = []
-        pins = pinned.filter { seen.insert($0).inserted }
+        pins = pinned.map { bindings[$0] ?? $0 }.filter { seen.insert($0).inserted }
         let assignmentObjects = state["thread-project-assignments"] as? [String: JSONObject] ?? [:]
         assignments = assignmentObjects.mapValues { $0.compactMapValues { $0 as? String } }
         let raw = state["local-projects"] as? [String: JSONObject] ?? [:]
@@ -123,7 +130,13 @@ struct PrismCatalog {
             guard let id = section["id"] as? String, !id.isEmpty,
                   let name = (section["name"] ?? section["title"]) as? String,
                   let items = section["itemKeys"] as? [String] else { return nil }
-            let threadKeys = items.filter { $0.hasPrefix(Self.threadPrefix) && $0.count > Self.threadPrefix.count }
+            var seenThreads: Set<String> = []
+            let threadKeys = items.compactMap { item -> String? in
+                guard item.hasPrefix(Self.threadPrefix), item.count > Self.threadPrefix.count else { return nil }
+                let id = String(item.dropFirst(Self.threadPrefix.count))
+                let key = Self.threadPrefix + (bindings[id] ?? id)
+                return seenThreads.insert(key).inserted ? key : nil
+            }
             let projectKeys = items.compactMap { item -> String? in
                 guard item.hasPrefix(Self.projectPrefix) else { return nil }
                 let id = String(item.dropFirst(Self.projectPrefix.count))
@@ -138,7 +151,7 @@ struct PrismCatalog {
     }
 
     private func project(id: String, row: [String: String]?, fallback: [String: String]?) -> String? {
-        if let assigned = assignments[id]?["projectId"], !assigned.isEmpty { return assigned }
+        if let assigned = assignments[id]?["projectId"], !assigned.isEmpty { return aliases[assigned] ?? assigned }
         if let native = row?["project_id"], !native.isEmpty { return aliases[native] ?? native }
         let cwd = row?["cwd"].flatMap { $0.isEmpty ? nil : $0 } ?? fallback?["cwd"]
         return projects.first(where: { $0["path"] == cwd })?["id"]
@@ -154,11 +167,13 @@ struct PrismCatalog {
         for (index, id) in pins.enumerated() {
             let row = try catalog.row(id)
             let old = try legacy.row(id)
-            guard (Int(old?["archived"] ?? "") ?? 0) == 0,
-                  !(row?["display_title"] ?? "").isEmpty || !(old?["name"] ?? "").isEmpty else { continue }
+            guard (Int(old?["archived"] ?? "") ?? 0) == 0 else { continue }
+            let hasTitle = !(row?["display_title"] ?? "").isEmpty || !(old?["name"] ?? "").isEmpty
             let key = Self.threadPrefix + id
             let location: Any = project(id: id, row: row, fallback: old) as Any? ?? NSNull()
-            threads.append(["id": id, "kind": "codex", "hostId": "local", "projectId": location, "nativeIndex": index + 1])
+            var thread: JSONObject = ["id": id, "kind": "codex", "hostId": "local", "projectId": location, "nativeIndex": index + 1]
+            if !hasTitle { thread["pending"] = true }
+            threads.append(thread)
             locations[key] = location
             editable.insert(key)
         }
@@ -170,7 +185,7 @@ struct PrismCatalog {
             let old = try legacy.row(id)
             let archived = (Int(old?["archived"] ?? "") ?? 0) != 0
             let inSection = sectionThreads.contains(key)
-            if (key == editing || inSection), !archived, row != nil || old != nil { editable.insert(key) }
+            if !archived, inSection || (key == editing && (row != nil || old != nil)) { editable.insert(key) }
             let location: Any = project(id: id, row: row, fallback: archived ? nil : old) as Any? ?? NSNull()
             if inherited.contains(key) || inSection { locations[key] = location }
             if inSection, !archived, row != nil || old != nil {
@@ -181,6 +196,7 @@ struct PrismCatalog {
         let visibleProjects = projects.map { $0.filter { $0.key != "path" } }
         return (["account": account, "threads": threads, "projects": visibleProjects,
                  "projectAliases": aliases, "threadProjects": locations,
-                 "customSections": customSections.map(\.json), "customThreads": customThreads], editable)
+                 "customSections": customSections.map(\.json), "customThreads": customThreads,
+                 "clientBindings": clientBindings], editable)
     }
 }

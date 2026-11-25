@@ -1,4 +1,4 @@
-# Packpier 0.1.30 for Windows x64 (preview)
+# Packpier 0.1.31 for Windows x64 (preview)
 
 Extract the entire ZIP on Windows 11 x64, then run `Packpier.Windows.exe` from the extracted folder. Keep the files together. This self-contained preview includes the .NET 10 Desktop Runtime, so no separate installation is needed.
 

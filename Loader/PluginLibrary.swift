@@ -77,9 +77,7 @@ final class PluginLibrary {
         }
         lock = fd
         try finishPendingRemoval()
-        if let bundled, let version = manifests[BuiltInPackages.background]?["version"] as? String {
-            try upgradeBuiltInBackground(from: bundled, version: version)
-        }
+        if let bundled { try upgradeBuiltIns(from: bundled) }
     }
 
     deinit { close(lock) }
@@ -220,33 +218,36 @@ final class PluginLibrary {
         return String(format: "%016llx", hash)
     }
 
-    private func upgradeBuiltInBackground(from bundled: URL, version: String) throws {
-        let fm = FileManager.default
-        let id = BuiltInPackages.background
+    private func upgradeBuiltIns(from bundled: URL) throws {
         let packages = root.appendingPathComponent("packages")
-        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
-        guard try packages.resourceValues(forKeys: keys).isSymbolicLink == false else {
+        guard try packages.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == false else {
             throw LibraryError("Unexpected package directory symlink")
         }
-        let installed = try plugins(settings: [:]).first { $0.id == id }
-        guard let directory = installed?.directory,
-              let old = try readObject(directory.appendingPathComponent("package.json"))["version"] as? String,
-              BuiltInPackages.upgradesBackground(from: old, to: version) else { return }
+        for plugin in try plugins(settings: [:]) {
+            let id = plugin.id
+            guard let version = bundledManifests[id]?["version"] as? String,
+                  let old = try readObject(plugin.directory.appendingPathComponent("package.json"))["version"] as? String,
+                  BuiltInPackages.upgrades(id, from: old, to: version) else { continue }
+            try replaceBuiltIn(id, old: old, source: bundled.appendingPathComponent(id), destination: plugin.directory)
+        }
+    }
 
+    private func replaceBuiltIn(_ id: String, old: String, source: URL, destination: URL) throws {
+        let fm = FileManager.default
         let backups = root.appendingPathComponent("Backups", isDirectory: true)
         try fm.createDirectory(at: backups, withIntermediateDirectories: true)
-        guard try backups.resourceValues(forKeys: keys).isSymbolicLink == false else {
+        guard try backups.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == false else {
             throw LibraryError("Unexpected package backup directory symlink")
         }
         let transaction = UUID().uuidString
-        let stage = packages.appendingPathComponent(".packpier-upgrade-" + transaction)
+        let stage = destination.deletingLastPathComponent().appendingPathComponent(".packpier-upgrade-" + transaction)
         let backup = backups.appendingPathComponent(id + "-" + old + "-" + transaction)
         defer { try? fm.removeItem(at: stage) }
-        try fm.copyItem(at: bundled.appendingPathComponent(id), to: stage)
+        try fm.copyItem(at: source, to: stage)
         do {
-            try fm.copyItem(at: directory, to: backup)
+            try fm.copyItem(at: destination, to: backup)
             // Both directories are on the library volume and the loader holds the library lock.
-            if renamex_np(stage.path, directory.path, UInt32(RENAME_SWAP)) != 0 {
+            if renamex_np(stage.path, destination.path, UInt32(RENAME_SWAP)) != 0 {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
         } catch {
