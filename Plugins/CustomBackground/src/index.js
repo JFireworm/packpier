@@ -12,6 +12,7 @@ import {
 } from "./background-mode.js";
 import { isCodexPetRendererLocation } from "./renderer-scope.js";
 import { createThreadClipping, THREAD_CLIP_ANCHORS } from "./thread-clipping.js";
+import { effectiveCSSZoom } from "./css-zoom.js";
 
 const RUNTIME_KEY = Symbol.for("codex-tweaks.codex-custom-background.runtime");
 const LEGACY_RUNTIME_KEY = Symbol.for("codex-tweaks.codex-random-background.runtime");
@@ -539,6 +540,7 @@ export function activate({ api, node, ui }) {
     if (!surface) return;
     // 一个独立的底层磨砂面覆盖侧栏、标题栏和外圈，中间工作区挖空。
     // 不把滤镜加在应用祖先上，避免再次截断输入框的 backdrop 采样。
+    // 磨砂节点挂在 body，位于 Codex 缩放容器之外，直接使用视口坐标。
     const { left, top, right, bottom } = surface.getBoundingClientRect();
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -1890,7 +1892,8 @@ export function activate({ api, node, ui }) {
     }));
 
     menu.append(copyItem, saveItem);
-    // The settings dialog owns the active pointer and focus scope. A popover keeps viewport coordinates.
+    // The settings dialog owns the pointer and focus scope. The popover uses the viewport
+    // as its containing block and still inherits CSS zoom from the settings pane.
     menu.popover = "manual";
     (settingsPaneNode || document.body).append(menu);
     menu.showPopover();
@@ -1904,10 +1907,11 @@ export function activate({ api, node, ui }) {
     const anchorX = eventHasPoint ? event.clientX : (triggerRect?.left ?? 8) + 12;
     const anchorY = eventHasPoint ? event.clientY : (triggerRect?.bottom ?? 8) + 4;
     const margin = 8;
-    const left = Math.min(Math.max(margin, anchorX), window.innerWidth - rect.width - margin);
-    const top = Math.min(Math.max(margin, anchorY), window.innerHeight - rect.height - margin);
-    menu.style.left = `${Math.round(left)}px`;
-    menu.style.top = `${Math.round(top)}px`;
+    const left = Math.max(margin, Math.min(anchorX, window.innerWidth - rect.width - margin));
+    const top = Math.max(margin, Math.min(anchorY, window.innerHeight - rect.height - margin));
+    const zoom = effectiveCSSZoom(menu);
+    menu.style.left = `${left / zoom}px`;
+    menu.style.top = `${top / zoom}px`;
     historyContextMenuNode = menu;
     historyContextMenuTriggerNode = trigger;
     window.requestAnimationFrame(() => {

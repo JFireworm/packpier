@@ -87,7 +87,7 @@ async function checkTransparentWindow(effects, storageKey) {
 
   const nativePaint = paint();
   const previous = localStorage.getItem(storageKey);
-  localStorage.setItem(storageKey, JSON.stringify({ kind: "transparent" }));
+  localStorage.setItem(storageKey, JSON.stringify({ kind: "transparent", frostEnabled: true }));
   const state = { enabled: true, packages: [{ id: "custom-background" }] };
   effects.apply(state);
   check(document.documentElement.hasAttribute("data-packpier-cbgp-transparent"), "Transparent mode did not mount");
@@ -129,6 +129,48 @@ async function checkTransparentWindow(effects, storageKey) {
   check(document.elementFromPoint(composerBox.x + 8, composerBox.y + 8) === composer,
     "Clipping the transcript affected interaction with the composer");
 
+  const scroll = () => {
+    timeline.dispatchEvent(new Event("scroll"));
+    renderFrame();
+  };
+  const surface = fixture.querySelector("#window-fixture");
+  const frost = document.querySelector("[data-packpier-cbgp-window-frost]");
+  transcript.style.height = "12000px";
+  timeline.scrollTop = 6500;
+  for (const zoom of [1.25, 0.8]) {
+    fixture.style.zoom = String(zoom);
+    window.dispatchEvent(new Event("resize"));
+    await new Promise(resolve => setTimeout(resolve, 110));
+    scroll();
+    check(Math.abs(transcript.currentCSSZoom - zoom) < 0.01, "Transcript must inherit the fixture zoom");
+    const x = timeline.getBoundingClientRect().left + 16;
+    const visibleAt = y => document.elementsFromPoint(x, y).includes(transcript);
+    const topEdge = topFade.getBoundingClientRect().bottom;
+    const bottomEdge = footerFade.getBoundingClientRect().top;
+    check(!visibleAt(topEdge - 3) && visibleAt(topEdge + 3) &&
+      visibleAt(bottomEdge - 3) && !visibleAt(bottomEdge + 3),
+      `Transcript clip missed viewport boundaries at zoom ${zoom}: ${getComputedStyle(transcript).clipPath}`);
+
+    const { left, top, right, bottom } = surface.getBoundingClientRect();
+    const polygon = [...frost.style.clipPath.matchAll(/(-?[\d.]+)px/g)].map(match => Number(match[1]));
+    check(frost.parentElement === document.body && frost.currentCSSZoom === 1 &&
+      [left, top, right, top, right, bottom, left, bottom].every((value, i) =>
+        Math.abs(polygon[i + 10] - value) < 0.01), "The frost cutout did not follow the zoomed surface");
+  }
+  fixture.style.removeProperty("zoom");
+  for (const height of [204, 220]) {
+    footerFade.style.height = `${height}px`;
+    scroll();
+    check(getComputedStyle(transcript).clipPath === "none" && transcriptAt(110),
+      "Equal or inverted boundaries hid the transcript instead of clearing the clip");
+  }
+  footerFade.style.height = "96px";
+  scroll();
+  check(transcriptAt(110) && !transcriptAt(160), "Clipping did not recover when the boundaries became valid");
+  transcript.style.removeProperty("height");
+  timeline.scrollTop = 160;
+  scroll();
+
   const marker = "data-packpier-cbgp-transcript-clip";
   const clearClip = () => !transcript.hasAttribute(marker) &&
     !transcript.style.getPropertyValue("--ct-cbgp-transcript-clip") &&
@@ -164,6 +206,37 @@ async function checkTransparentWindow(effects, storageKey) {
   window.cancelAnimationFrame = cancelFrame;
   localStorage.setItem(storageKey, previous);
   fixture.remove();
+}
+
+function checkHistoryMenuZoom(dialog) {
+  const card = dialog.querySelector('[data-slot="favorites-grid"] .ct-cbgp-history-card');
+  for (const zoom of [1.25, 0.8]) {
+    dialog.style.zoom = String(zoom);
+    const dispatchMenu = event => {
+      card.dispatchEvent(event);
+      const menu = dialog.querySelector("[data-packpier-cbgp-context-menu]");
+      check(menu?.matches(":popover-open") && Math.abs(menu.currentCSSZoom - zoom) < 0.01,
+        "The history popover must stay inside the zoomed settings pane");
+      return menu.getBoundingClientRect();
+    };
+    const close = () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    const near = (actual, target) => Math.abs(actual - target) < 1;
+    const point = dispatchMenu(new MouseEvent("contextmenu", { clientX: 200, clientY: 140 }));
+    check(near(point.left, 200) && near(point.top, 140), "History menu missed its pointer anchor at zoom " + zoom);
+    close();
+    const edge = dispatchMenu(new MouseEvent("contextmenu", { clientX: innerWidth - 1, clientY: innerHeight - 1 }));
+    check(near(edge.right, innerWidth - 8) && near(edge.bottom, innerHeight - 8),
+      "History menu exceeded viewport edges at zoom " + zoom);
+    close();
+    const button = card.getBoundingClientRect();
+    const keyboard = dispatchMenu(new KeyboardEvent("keydown", { key: "F10", shiftKey: true }));
+    const clamp = (position, limit) => Math.max(8, Math.min(position, limit - 8));
+    check(near(keyboard.left, clamp(button.left + 12, innerWidth - keyboard.width)) &&
+      near(keyboard.top, clamp(button.bottom + 4, innerHeight - keyboard.height)),
+      "History menu missed its keyboard anchor at zoom " + zoom);
+    close();
+  }
+  dialog.style.removeProperty("zoom");
 }
 
 function nativeRailRects(rail) {
@@ -272,11 +345,12 @@ function checkPalettePlacement() {
   fixture.setAttribute("data-app-action-sidebar-section-heading", "Placement fixture");
   fixture.innerHTML = `
     <style>
-      .placement-row {width:240px;border:1px solid transparent;box-sizing:border-box;white-space:nowrap}
+      .placement-row {width:240px;border:solid transparent;border-width:3px 4px 1px 2px;box-sizing:border-box;white-space:nowrap}
       .placement-title {display:block;width:100%;padding:3px 0;border:0;text-align:start}
       .placement-actions {display:flex;gap:5px;position:absolute;inset-inline-end:8px;top:3px}
       .placement-actions button {width:20px;height:20px;padding:0}
       .placement-ignored {position:absolute;inset-inline-start:65px;top:2px;width:20px;height:20px}
+      .placement-fixed {display:block;height:36px;text-align:start}
     </style>
     <div class="placement-row" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="placement">
       <div data-thread-title-trigger><button class="placement-title" data-interactive-row-button><span data-thread-title>Chat</span></button></div>
@@ -286,34 +360,75 @@ function checkPalettePlacement() {
       </div>
       <button class="placement-ignored sr-only" aria-label="Keyboard action"></button>
       <button class="placement-ignored" style="visibility:hidden" aria-label="Hidden action"></button>
-    </div>`;
+    </div>
+    <button class="placement-row placement-fixed" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-id="placement-fixed">
+      <span data-thread-title>Chat</span>
+    </button>`;
   document.querySelector("[data-sidebar-navigation-root]").append(fixture);
   window.__prismNativeSidebarV1.refreshNow();
-  const row = fixture.querySelector(".placement-row");
+  const row = fixture.querySelector("div.placement-row");
+  const fixedRow = fixture.querySelector(".placement-fixed");
   const title = row.querySelector("[data-thread-title]");
   const actions = row.querySelector(".placement-actions");
-  const hover = () => {
-    title.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
-    return row.querySelector(".prism-dot");
+  const hover = (target = row) => {
+    target.querySelector("[data-thread-title]").dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    return document.querySelector(".prism-dot");
   };
-  function checkBounds(dot, rtl = false) {
+  function checkBounds(target, dot, rtl, dotZoom) {
     const box = dot.getBoundingClientRect();
-    const bounds = row.getBoundingClientRect();
+    const bounds = target.getBoundingClientRect();
     const range = document.createRange();
-    range.selectNodeContents(title);
+    range.selectNodeContents(target.querySelector("[data-thread-title]"));
     const text = range.getBoundingClientRect();
-    check(!dot.hidden && box.width === 22 && box.left >= bounds.left && box.right <= bounds.right &&
+    check(!dot.hidden && Math.abs(box.width - 22 * dotZoom) < 0.1 && box.left >= bounds.left && box.right <= bounds.right &&
       box.top >= bounds.top && box.bottom <= bounds.bottom, "Prism dot escaped its row");
+    check(Math.abs((box.top + box.bottom) / 2 - (bounds.top + bounds.bottom) / 2) < 0.1,
+      "Prism dot was not vertically centered at zoom " + target.currentCSSZoom);
     check(rtl ? box.right <= text.left : box.left >= text.right, "Prism dot overlaps the visible title text");
     return box;
   }
-  function checkActions(dot, rtl = false) {
-    const box = checkBounds(dot, rtl);
-    for (const button of actions.querySelectorAll("button")) {
-      const native = button.getBoundingClientRect();
-      check(rtl ? native.right + 6 <= box.left : box.right + 6 <= native.left, "Prism dot overlaps native actions");
-    }
+  function checkActions(dot, rtl = false, zoom = 1) {
+    check(dot.parentElement === row, "Expected a nested dot");
+    const box = checkBounds(row, dot, rtl, zoom);
+    const native = actions.getBoundingClientRect();
+    const gap = rtl ? box.left - native.right : native.left - box.right;
+    check(gap >= 6 * zoom - 0.1 && gap < 6 * zoom + 1.1,
+      "Prism dot spacing from native actions was wrong at zoom " + zoom);
   }
+  function checkTrailingGap(target, box, rtl, zoom) {
+    const bounds = target.getBoundingClientRect();
+    const gap = rtl ? box.left - bounds.left : bounds.right - box.right;
+    check(gap >= 30 * zoom - 0.1 && gap < 30 * zoom + 1.1,
+      "An action-free row did not keep its trailing clearance at zoom " + zoom);
+  }
+  for (const zoom of [1.25, 0.8]) {
+    fixture.style.zoom = String(zoom);
+    for (const direction of ["ltr", "rtl"]) {
+      const rtl = direction === "rtl";
+      row.dir = fixedRow.dir = direction;
+      checkActions(hover(), rtl, zoom);
+      actions.hidden = true;
+      actions.style.display = "none";
+      checkTrailingGap(row, checkBounds(row, hover(), rtl, zoom), rtl, zoom);
+      actions.hidden = false;
+      actions.style.removeProperty("display");
+      const fixedDot = hover(fixedRow);
+      check(!fixedRow.contains(fixedDot) && getComputedStyle(fixedDot).position === "fixed", "Expected a body-portal dot");
+      checkTrailingGap(fixedRow, checkBounds(fixedRow, fixedDot, rtl, 1), rtl, zoom);
+    }
+    const dot = hover(fixedRow);
+    const anchor = dot.getBoundingClientRect();
+    dot.click();
+    const panel = document.querySelector('.prism-pop:not([hidden])[role="dialog"]');
+    const picker = panel.getBoundingClientRect();
+    const expectedTop = anchor.bottom + 5 + picker.height <= innerHeight - 5
+      ? anchor.bottom + 5 : Math.max(5, anchor.top - 5 - picker.height);
+    check(panel.currentCSSZoom === 1 && picker.left >= 5 && picker.right <= innerWidth - 5 &&
+      Math.abs(picker.top - expectedTop) < 1, "Picker escaped the viewport or missed its zoomed row anchor");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  }
+  fixture.style.removeProperty("zoom");
+  row.dir = "ltr";
   checkActions(hover());
   row.dir = "rtl";
   checkActions(hover(), true);
@@ -322,9 +437,7 @@ function checkPalettePlacement() {
   checkActions(hover());
   actions.hidden = true;
   actions.style.display = "none";
-  const fallback = checkBounds(hover());
-  const trailingGap = row.getBoundingClientRect().right - fallback.right;
-  check(trailingGap >= 30 && trailingGap < 31, "An action-free row did not keep its trailing clearance");
+  checkTrailingGap(row, checkBounds(row, hover(), false, 1), false, 1);
   row.style.width = "92px";
   title.textContent = "A long title";
   const narrowDot = hover();
@@ -658,6 +771,7 @@ async function run() {
       check(firstPaintTiles > 0 && firstPaintTiles <= 8, "Thumbnail work blocked first paint: " + firstPaintTiles);
       check(native.parentNode.querySelector("[data-packpier-background-pane]")?.textContent.includes("收藏"), "Missing embedded background pane");
       check(sheet.hidden && getComputedStyle(native).display === "none", "Incorrect pane layering");
+      if (i === 0) checkHistoryMenuZoom(dialog);
       dialog.querySelector('[data-settings-panel-slug="voice"]').click();
       check(getComputedStyle(native).display !== "none" && !dialog.querySelector("[data-packpier-background-pane]"), "Native tab did not recover");
       appearance.after(appearance.cloneNode(true));

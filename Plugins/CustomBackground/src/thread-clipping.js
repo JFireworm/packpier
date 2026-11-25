@@ -1,3 +1,5 @@
+import { effectiveCSSZoom } from "./css-zoom.js";
+
 // These layout anchors come from Codex 26.1117.41037. Missing anchors disable clipping.
 const MAIN_SURFACE = '[data-app-shell-main-surface="default"]';
 const TIMELINE = "[data-app-action-timeline-scroll]";
@@ -30,9 +32,13 @@ export function createThreadClipping() {
     const content = transcript.getBoundingClientRect();
     const top = Math.max(viewport.top, header.getBoundingClientRect().bottom);
     const bottom = Math.min(viewport.bottom, footer.getBoundingClientRect().top);
-    // The title bar and composer stay in place while the transcript's own box scrolls.
-    const clip = `inset(${Math.max(0, top - content.top)}px 0 ${Math.max(0, content.bottom - bottom)}px)`;
+    const zoom = effectiveCSSZoom(transcript);
+    // The rectangles are in viewport pixels, but inset() takes pixels in the transcript's own box.
+    const clip = bottom > top
+      ? `inset(${Math.max(0, top - content.top) / zoom}px 0 ${Math.max(0, content.bottom - bottom) / zoom}px)`
+      : "";
     if (clip !== lastClip) {
+      // An empty value removes the inline property. Keep observing so valid bounds can recover.
       transcript.style.setProperty(CLIP_PROPERTY, clip);
       lastClip = clip;
     }

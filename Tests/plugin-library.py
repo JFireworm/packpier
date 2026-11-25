@@ -166,9 +166,11 @@ if __name__ == "__main__":
         print("PASS upgrade reports shipped builtin versions and preserves all existing JSON")
 
     upgrades = [
-        ("custom-background", "1.3.18", "1.3.19", "src/thread-clipping.js"),
-        ("prism", "0.1.11", "0.1.13", "renderer.js"),
-        ("prism", "0.1.12", "0.1.13", "renderer.js"),
+        ("custom-background", "1.3.18", "1.3.20", "src/thread-clipping.js"),
+        ("custom-background", "1.3.19", "1.3.20", "src/thread-clipping.js"),
+        ("prism", "0.1.11", "0.1.14", "renderer.js"),
+        ("prism", "0.1.12", "0.1.14", "renderer.js"),
+        ("prism", "0.1.13", "0.1.14", "renderer.js"),
     ]
     for plugin, old_version, new_version, source_file in upgrades:
         with TemporaryDirectory(prefix="packpier-builtin-upgrade-") as tmp:

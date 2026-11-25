@@ -1,5 +1,53 @@
 import SwiftUI
 
+@MainActor final class UpdateFailureLogger: NSObject, SPUUpdaterDelegate {
+    private let log: ConnectionLog
+
+    init(log: ConnectionLog) { self.log = log }
+
+    // Sparkle delivers the wrapped download error here too, so one callback covers the failure once.
+    func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
+        record(error)
+    }
+
+    func record(_ error: Error) {
+        if let message = Self.summary(error as NSError) { try? log.append(message) }
+    }
+
+    static func summary(_ error: NSError) -> String? {
+        let normalSparkleCodes = [SUNoUpdateError, SUInstallationCanceledError, SUInstallationAuthorizeLaterError]
+        if error.domain == SUSparkleErrorDomain && normalSparkleCodes.contains(where: { Int($0) == error.code }) { return nil }
+        if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return nil }
+
+        var codes: [String] = []
+        var host: String?
+        var next: NSError? = error
+        for _ in 0..<8 {
+            guard let current = next else { break }
+            let domain = current.domain.range(of: #"^[A-Za-z0-9_.-]{1,128}$"#, options: .regularExpression) == nil
+                ? "<redacted>" : current.domain
+            codes.append("\(domain)/\(current.code)")
+            host = failingHost(current) ?? host
+            next = current.userInfo[NSUnderlyingErrorKey] as? NSError
+        }
+        let chain = codes.joined(separator: " → ")
+        return "Sparkle update failed · \(chain)" + (host.map { " · host=\($0)" } ?? "")
+    }
+
+    private static func failingHost(_ error: NSError) -> String? {
+        for key in [NSURLErrorFailingURLErrorKey, NSURLErrorFailingURLStringErrorKey] {
+            let value = error.userInfo[key]
+            let url = value as? URL ?? (value as? String).flatMap { URL(string: $0) }
+            if let scheme = url?.scheme?.lowercased(), ["http", "https"].contains(scheme),
+               let host = url?.host?.lowercased(),
+               host.range(of: #"^[a-z0-9.\-:\[\]]{1,253}$"#, options: .regularExpression) != nil {
+                return host
+            }
+        }
+        return nil
+    }
+}
+
 @MainActor final class AppUpdates: ObservableObject {
     static let shared = AppUpdates()
     @Published private(set) var available = false
@@ -7,6 +55,7 @@ import SwiftUI
     @Published private(set) var automatic: Bool
     static let homepage = URL(string:"https://github.com/JFireworm/packpier")!
     private let defaults: UserDefaults
+    private let failureLogger = UpdateFailureLogger(log: ConnectionLog())
     private let controller: SPUStandardUpdaterController?
     private var observation: NSKeyValueObservation?
 
@@ -27,7 +76,7 @@ import SwiftUI
             controller = nil
             return
         }
-        let control = SPUStandardUpdaterController(starting:false,delegate:nil,driver:nil)
+        let control = SPUStandardUpdaterController(starting:false,delegate:failureLogger,driver:nil)
         controller = control
         do {
             try control.updater.start()
@@ -36,7 +85,10 @@ import SwiftUI
                 let ready = updater.canCheckForUpdates
                 Task { @MainActor [weak self] in self?.available = ready }
             }
-        } catch { notice = "更新服务启动失败" }
+        } catch {
+            failureLogger.record(error)
+            notice = "更新服务启动失败"
+        }
     }
 
     func setAutomatic(_ enabled: Bool) {

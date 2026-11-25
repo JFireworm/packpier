@@ -945,6 +945,7 @@ function mountPicker({ panel, isProject, getKey, getPreferences, effectiveColor,
   } };
 }
 
+// The picker stays in the body portal, outside Codex's sidebar zoom.
 function createPickerPosition(panel) {
   const edge = 5;
   let origin;
@@ -996,7 +997,12 @@ var paletteRows = "[data-prism-native-rank],[data-prism-native-project],[data-pr
 const paletteDotSize = 22;
 const rowActionSelector = "button,[data-interactive-row-button],[role=button]";
 
-function paletteInlineStart(row, bounds, rtl) {
+function effectiveCSSZoom(element) {
+  const zoom = element.currentCSSZoom;
+  return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+}
+
+function paletteInlineStart(row, bounds, rtl, rowZoom, dotSize) {
   const inlineStart = (box) => rtl ? bounds.right - box.right : box.left - bounds.left;
   const inlineEnd = (box) => rtl ? bounds.right - box.left : box.right - bounds.left;
   const title = row.querySelector("[data-thread-title],.prism-group-toggle span") ?? row.querySelector("[data-thread-title-trigger]");
@@ -1022,14 +1028,14 @@ function paletteInlineStart(row, bounds, rtl) {
     if (button.closest(".prism-dot,.sr-only,[hidden]") || (title && (button.contains(title) || title.contains(button)))) continue;
     const box = button.getBoundingClientRect();
     const start = inlineStart(box);
-    if (!box.width || !box.height || start < titleStart - 1 || inlineEnd(box) > bounds.width + 1 ||
+    if (!box.width || !box.height || start < titleStart - rowZoom || inlineEnd(box) > bounds.width + rowZoom ||
         box.bottom <= bounds.top || box.top >= bounds.bottom || getComputedStyle(button).visibility !== "visible") continue;
     actionStart = Math.min(actionStart, start);
   }
   const limit = Math.min(actionStart, bounds.width);
-  const gap = Number.isFinite(actionStart) ? 6 : 30;
-  const start = Math.max(0, Math.floor(limit - gap - paletteDotSize));
-  return bounds.height >= paletteDotSize && start >= textEnd && start + paletteDotSize + gap <= limit ? start : null;
+  const gap = (Number.isFinite(actionStart) ? 6 : 30) * rowZoom;
+  const start = Math.floor(limit - gap - dotSize);
+  return bounds.height >= dotSize && start >= textEnd ? start : null;
 }
 
 function createControls({ root, getState, save, signal }) {
@@ -1095,16 +1101,20 @@ function createControls({ root, getState, save, signal }) {
       const bounds = activeRow.getBoundingClientRect();
       const style = getComputedStyle(activeRow);
       const rtl = style.direction === "rtl";
-      const start = paletteInlineStart(activeRow, bounds, rtl);
+      const nested = paletteButton.parentNode === activeRow;
+      const rowZoom = effectiveCSSZoom(activeRow);
+      // The dot inherits its parent's zoom, even while it has no box of its own.
+      const dotZoom = nested ? rowZoom : effectiveCSSZoom(root);
+      const dotSize = paletteDotSize * dotZoom;
+      const start = paletteInlineStart(activeRow, bounds, rtl, rowZoom, dotSize);
       paletteButton.hidden = start === null;
       if (start !== null) {
-        const nested = paletteButton.parentNode === activeRow;
         const viewportStart = rtl ? document.documentElement.clientWidth - bounds.right : bounds.left;
-        const inlineOrigin = nested ? -parseFloat(style.borderInlineStartWidth) : viewportStart;
-        const blockOrigin = nested ? -parseFloat(style.borderTopWidth) : bounds.top;
+        const inlineOrigin = nested ? -parseFloat(style.borderInlineStartWidth) * rowZoom : viewportStart;
+        const blockOrigin = nested ? -parseFloat(style.borderTopWidth) * rowZoom : bounds.top;
         paletteButton.style.direction = style.direction;
-        paletteButton.style.insetInlineStart = (inlineOrigin + start) + "px";
-        paletteButton.style.top = (blockOrigin + (bounds.height - paletteDotSize) / 2) + "px";
+        paletteButton.style.insetInlineStart = (inlineOrigin + start) / dotZoom + "px";
+        paletteButton.style.top = (blockOrigin + (bounds.height - dotSize) / 2) / dotZoom + "px";
         paletteButton.style.setProperty("--prism-swatch", activeRow.style.getPropertyValue("--prism-native-color") || activeRow.style.getPropertyValue("--prism-project-color") || "transparent");
       }
     } else if (!paletteButton.hidden) paletteButton.hidden = true;

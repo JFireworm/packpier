@@ -2,7 +2,7 @@
   {
     "id": "prism",
     "app": "codex",
-    "version": "0.1.13",
+    "version": "0.1.14",
     "name": {
       "zh-Hans": "Prism",
       "en": "Prism",
@@ -21,7 +21,7 @@
   {
     "id": "custom-background",
     "app": "codex",
-    "version": "1.3.19",
+    "version": "1.3.20",
     "name": {
       "zh-Hans": "自定义背景",
       "en": "Custom Background",
