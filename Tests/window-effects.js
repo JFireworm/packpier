@@ -272,6 +272,7 @@ async function run() {
   document.body.innerHTML = `<style>
       [data-app-action-sidebar-thread-row],[data-app-action-sidebar-project-row] { min-height: 26px; }
       nav[data-app-navigation-rail] { position: fixed; left: 8px; bottom: 4px; width: 36px; }
+      aside[data-sidebar-navigation-root] { margin-left: 52px; }
       .rail-stack { display: flex; flex-direction: column; gap: 8px; }
       .rail-stack button { width: 36px; height: 36px; padding: 0; }
       .rail-stack span { display: inline-flex; }
