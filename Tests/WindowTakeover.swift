@@ -26,25 +26,33 @@ import Foundation
                 </section></aside><main></main>`;
             globalThis.oldClosed = 0;
             document.querySelector("main").innerHTML = '<div class="packpier-p-sign" data-old-effect></div>';
-            globalThis.__PACKPIER__ = { version: "packpier-window-4", close() {
+            const orphan = document.createElement("style");
+            orphan.id = "legacy-psign";
+            orphan.textContent = ".packpier-p-sign { position-anchor: --packpier-profile; transform: translate(-50%, -50%); }";
+            document.head.append(orphan);
+            globalThis.__PACKPIER__ = { version: "packpier-window-5", close() {
                 document.querySelector("[data-old-effect]").remove();
                 globalThis.oldClosed++;
+                throw new Error("fixture legacy stylesheet cleanup failed");
             }};
             1
             """)
         let host = WindowInjection(page: page)
         var logs: [String] = []
-        try await host.apply(bundle: bundle, version: "packpier-window-5", packages: ["p-sign", "prism"]) {
+        try await host.apply(bundle: bundle, version: "packpier-window-8", packages: ["p-sign", "prism"]) {
             logs.append($0)
         }
         precondition(logs.map { $0.split(separator: " ").first! } == ["probe", "closeOld", "addBinding", "bundle", "apply"])
-        precondition(logs[0].contains("oldVersion=packpier-window-4"))
+        precondition(logs[0].contains("oldVersion=packpier-window-5"))
+        precondition(logs[1].contains("fixture legacy stylesheet cleanup failed"))
         precondition(host.connected && host.mounted == ["p-sign", "prism"])
         var rendered = false
         for _ in 0..<40 {
             let ready = try await page.evaluate("""
-                __PACKPIER__.version === 'packpier-window-5' && oldClosed === 1
+                __PACKPIER__.version === 'packpier-window-8' && oldClosed === 1
                 && document.querySelectorAll('.packpier-p-sign').length === 1
+                && !document.querySelector('#legacy-psign')
+                && getComputedStyle(document.querySelector('.packpier-p-sign')).transform === 'none'
                 && document.querySelector('[data-app-action-sidebar-thread-row]').style.getPropertyValue('--prism-native-color') === '#FF79A9'
                 """)
             if jsonBool(ready) == true { rendered = true; break }
@@ -53,11 +61,11 @@ import Foundation
         precondition(rendered, "Takeover did not restore Prism color")
         try await host.close()
         let cleaned = try await page.evaluate("""
-            !globalThis.__PACKPIER__ && !document.querySelector('.packpier-p-sign,[data-prism-accent]')
+            !globalThis.__PACKPIER__ && !document.querySelector('.packpier-p-sign,[data-prism-accent],style[data-packpier-style]')
             """)
         precondition(jsonBool(cleaned) == true)
         do {
-            try await host.apply(bundle: "throw new Error('fixture bundle failure')", version: "packpier-window-5",
+            try await host.apply(bundle: "throw new Error('fixture bundle failure')", version: "packpier-window-8",
                                  packages: ["prism"]) { _ in }
             preconditionFailure("Expected bundle stage error")
         } catch {
@@ -65,6 +73,6 @@ import Foundation
                          error.localizedDescription.contains("fixture bundle failure"))
         }
         precondition(!host.connected && host.mounted.isEmpty)
-        print("PASS window-4 → window-5, one root, Prism color, teardown, staged error detail")
+        print("PASS window-5 → window-8, orphan style after close failure, one root, Prism color, teardown, staged error detail")
     }
 }

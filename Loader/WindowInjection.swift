@@ -39,9 +39,16 @@ final class WindowInjection {
             log("probe ok \(elapsed()) oldVersion=\(installedVersion ?? "none")")
             if !owned, current?["exists"] as? Bool == true {
                 try begin("closeOld")
-                _ = try await page.evaluate("globalThis.__PACKPIER__?.close?.(); delete globalThis.__PACKPIER__; 1", timeout: 8)
+                let oldError = try await page.evaluate("""
+                    (() => {
+                      try { globalThis.__PACKPIER__?.close?.(); return null; }
+                      catch (error) { return String(error?.message ?? error); }
+                      finally { delete globalThis.__PACKPIER__; }
+                    })()
+                    """, timeout: 8) as? String
                 try await Task.sleep(for: .milliseconds(300))
-                log("closeOld ok \(elapsed())")
+                if let oldError { log("closeOld failed \(elapsed()) \(oldError); continuing with replacement") }
+                else { log("closeOld ok \(elapsed())") }
             }
             if !bindingAdded {
                 try begin("addBinding")

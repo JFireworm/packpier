@@ -337,6 +337,7 @@ function mountPrismSidebar({ mode, palette, colors = {}, projectIds = {}, thread
   }
   window[key]?.dispose();
   const style = document.createElement("style");
+  style.dataset.packpierStyle = "prism";
   style.setAttribute("data-prism-native-styles", "");
   style.textContent = `
     [data-sidebar-navigation-root] [data-prism-native-filtered] {display:none !important}
@@ -1569,6 +1570,7 @@ function activate({ node, onCleanup }) {
   const portal = document.createElement("div");
   portal.className = "prism-portal";
   const style = document.createElement("style");
+  style.dataset.packpierStyle = "prism";
   style.textContent = style_default;
   document.head.append(style);
   document.body.append(portal);

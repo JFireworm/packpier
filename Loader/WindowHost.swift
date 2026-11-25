@@ -34,7 +34,7 @@ final class WindowHost {
     private var background: BackgroundService?
     private let provider = BackgroundProvider()
     private var bundle: String?
-    private let bundleVersion = "packpier-window-5"
+    private let bundleVersion = "packpier-window-8"
     private var polling: Task<Void, Never>?
     private var stopped = false
     private var failures: [String: String] = [:]

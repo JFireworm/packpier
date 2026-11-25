@@ -166,33 +166,104 @@ async function checkTransparentWindow(effects, storageKey) {
   fixture.remove();
 }
 
-function checkPSignUpdateButton(rail, sign) {
+function nativeRailRects(rail) {
+  return JSON.stringify([...rail.querySelectorAll("button")].map(button => button.getBoundingClientRect().toJSON()));
+}
+
+async function checkPSignUpdateButton(rail, sign, originalRects) {
   const usage = rail.querySelector("button");
   const update = document.createElement("span");
   update.innerHTML = '<button type="button">Update available</button>';
+  check(getComputedStyle(sign).transform === "none", "Legacy P-Sign transform changed the anchor position");
+  const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
-  function checkTargets() {
+  function checkTargets(first, gap = 8) {
     const anchor = sign.querySelector(".pp-sign-anchor");
-    let previousBottom = 0;
+    const mark = sign.getBoundingClientRect();
+    const native = first.getBoundingClientRect();
+    check(mark.width === 36 && mark.height === 36 && mark.left === native.left &&
+      native.top - mark.bottom === gap, "P-Sign did not follow the top visible native layout item");
     for (const button of [anchor, ...rail.querySelectorAll("button")]) {
+      if (!button.getClientRects().length) continue;
       const rect = button.getBoundingClientRect();
       const name = button.getAttribute("aria-label") || button.textContent;
-      check(rect.top >= previousBottom, name + " overlaps the preceding rail button");
       check(button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)),
         name + " does not receive pointer input at its center");
-      previousBottom = rect.bottom;
     }
   }
-  checkTargets();
+  check(nativeRailRects(rail) === originalRects, "Mounting P-Sign moved native navigation buttons");
+  checkTargets(usage);
   const initialTop = sign.getBoundingClientRect().top;
   usage.before(update);
-  checkTargets();
-  usage.remove();
-  checkTargets();
-  update.after(usage);
+  const withUpdate = nativeRailRects(rail);
+  await settle();
+  checkTargets(update.firstElementChild);
+  check(sign.getBoundingClientRect().top === initialTop - 44, "P-Sign did not move up one native row");
+  check(nativeRailRects(rail) === withUpdate, "Following the update button changed native button coordinates");
+
+  const updateButton = update.firstElementChild;
+  const icon = updateButton.firstChild;
+  const updateTop = updateButton.getBoundingClientRect().top;
+  const spinner = document.createElement("div");
+  spinner.setAttribute("role", "progressbar");
+  spinner.style.cssText = "width:36px;height:36px";
+  icon.replaceWith(spinner);
+  updateButton.disabled = true;
+  updateButton.setAttribute("aria-hidden", "true");
+  updateButton.style.opacity = "0";
+  update.dataset.state = "loading";
+  await settle();
+  checkTargets(update);
+  check(spinner.getBoundingClientRect().top - sign.getBoundingClientRect().bottom === 8,
+    "The progressbar inside the faded update button lost its 8px gap");
+  check(nativeRailRects(rail) === withUpdate, "An icon-to-spinner swap displaced native navigation buttons");
+
+  const wrapper = document.createElement("div");
+  wrapper.style.display = "contents";
+  const busy = document.createElement("div");
+  busy.setAttribute("aria-busy", "true");
+  busy.dataset.state = "loading";
+  busy.style.cssText = "width:36px;height:36px";
+  busy.append(spinner);
+  wrapper.append(busy);
+  const remainingRects = JSON.stringify(JSON.parse(withUpdate).slice(1));
+  update.replaceWith(wrapper);
+  await settle();
+  checkTargets(busy);
+  check(busy.getBoundingClientRect().top === updateTop && nativeRailRects(rail) === remainingRects,
+    "The busy wrapper or native navigation buttons moved during loading");
+
+  wrapper.replaceWith(update);
+  updateButton.append(icon);
+  updateButton.disabled = false;
+  updateButton.removeAttribute("aria-hidden");
+  updateButton.style.removeProperty("opacity");
+  delete update.dataset.state;
+  await settle();
+  checkTargets(updateButton);
+  check(nativeRailRects(rail) === withUpdate, "Restoring the update icon displaced native navigation buttons");
+
+  update.style.display = "none";
+  await settle();
+  checkTargets(usage);
   update.remove();
-  checkTargets();
-  check(sign.getBoundingClientRect().top === initialTop, "P-Sign did not return after the update button disappeared");
+  await settle();
+  checkTargets(usage);
+  check(sign.getBoundingClientRect().top === initialTop && nativeRailRects(rail) === originalRects,
+    "Removing the update button did not restore the original geometry");
+
+  rail.style.top = "40px";
+  rail.style.bottom = "auto";
+  await settle();
+  checkTargets(usage, 4);
+  check(sign.getBoundingClientRect().top === 0, "P-Sign went outside the viewport when its gap was constrained");
+  rail.style.top = "24px";
+  await settle();
+  check(sign.hidden, "P-Sign covered a native button when there was no room for the icon");
+  rail.style.removeProperty("top");
+  rail.style.removeProperty("bottom");
+  await settle();
+  checkTargets(usage);
 }
 
 function checkPalettePlacement() {
@@ -274,7 +345,7 @@ async function run() {
       nav[data-app-navigation-rail] { position: fixed; left: 8px; bottom: 4px; width: 36px; }
       aside[data-sidebar-navigation-root] { margin-left: 52px; }
       .rail-stack { display: flex; flex-direction: column; gap: 8px; }
-      .rail-stack button { width: 36px; height: 36px; padding: 0; }
+      .rail-stack button { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; }
       .rail-stack span { display: inline-flex; }
     </style>
     <nav data-app-navigation-rail><div><div class="rail-stack">
@@ -320,6 +391,18 @@ async function run() {
   const threadProjects = { [pinnedKey]: "beak-id", [flyingThreadKey]: "d0b14761" };
   let snapshotReads = 0;
   const edits = [];
+  const addSheet = (css) => {
+    const sheet = document.createElement("style");
+    sheet.textContent = css;
+    document.head.append(sheet);
+    return sheet;
+  };
+  const legacySheets = [
+    addSheet("@supports (position-anchor: --packpier-profile) { .packpier-p-sign { position-anchor: --packpier-profile; transform: translate(-50%, -50%); } }"),
+    addSheet(".prism-tools { visibility: hidden; }"),
+    addSheet("[data-packpier-cbgp-wallpaper] { visibility: hidden; }"),
+  ];
+  const nativeSheet = addSheet('/* .prism- is only mentioned in a comment */ aside { --fixture-label: ".packpier-p-sign"; }');
   const effects = createWindowEffects({
     prismService: {
       on: () => () => {},
@@ -354,12 +437,20 @@ async function run() {
       },
     },
   });
+  check(legacySheets.every(sheet => !sheet.isConnected) && nativeSheet.isConnected,
+    "Runtime startup should remove only identifiable legacy plugin styles");
+  const markedOrphan = addSheet(".packpier-p-sign { transform: translate(-50%, -50%); }");
+  markedOrphan.dataset.packpierStyle = "p-sign";
   const state = window.fixtureState;
   const rail = document.querySelector("nav[data-app-navigation-rail]");
-  const nativeRailHeight = rail.getBoundingClientRect().height;
+  const originalRailRects = nativeRailRects(rail);
   const result = effects.apply(state);
   check(result.mounted.join() === "p-sign,prism,custom-background", JSON.stringify(result));
+  check(!markedOrphan.isConnected && document.querySelectorAll('style[data-packpier-style="p-sign"]').length === 1,
+    "P-Sign mount did not replace the previously marked style");
   await new Promise(resolve => setTimeout(resolve, 100));
+  check(document.querySelectorAll('style[data-packpier-style="prism"]').length === 2 &&
+    document.querySelectorAll('style[data-packpier-style="custom-background"]').length === 1, "A plugin style is missing its ID");
   const row = document.querySelector("[data-app-action-sidebar-thread-row]");
   check(row.style.getPropertyValue("--prism-native-color") === "#FF79A9", "Missing native row color");
   const flying = document.querySelector("#flying");
@@ -482,7 +573,7 @@ async function run() {
   check(!wallpaper.hidden && wallpaper.style.cssText.includes("first.webp"), "Missing wallpaper");
   const sign = document.querySelector(".packpier-p-sign");
   check(getComputedStyle(sign).display !== "none", "P-Sign hidden");
-  checkPSignUpdateButton(rail, sign);
+  await checkPSignUpdateButton(rail, sign, originalRailRects);
   sign.dispatchEvent(new Event("pointerenter"));
   const [image, settings] = sign.querySelectorAll('[role="toolbar"] button');
   check(!image.closest("[hidden]"), "Hover tray hidden");
@@ -495,9 +586,11 @@ async function run() {
   check(wallpaper.style.getPropertyValue("--ct-cbgp-bg-image").includes(pixel), "Favorite did not become wallpaper");
   effects.apply(state);
   check(sign === document.querySelector(".packpier-p-sign"), "Unexpected remount");
+  const nativeRectsBeforeStop = nativeRailRects(rail);
   const withoutSign = effects.apply({ ...state, packages: state.packages.filter(p => p.id !== "p-sign") });
   check(withoutSign.mounted.join() === "prism,custom-background" && !sign.isConnected, "P-Sign did not stop independently");
-  check(rail.getBoundingClientRect().height === nativeRailHeight, "Stopping P-Sign left a gap in the rail");
+  check(!document.querySelector('style[data-packpier-style="p-sign"]'), "Disabling P-Sign left its style mounted");
+  check(nativeRailRects(rail) === nativeRectsBeforeStop, "Stopping P-Sign changed native button coordinates");
   check(row.style.getPropertyValue("--prism-native-color") === "#FF79A9" &&
     !wallpaper.hidden && wallpaper.isConnected, "Stopping P-Sign affected Prism or the wallpaper");
   check(JSON.parse(localStorage.getItem(storageKey)).favorites[0].file === favorite.file, "Stopping P-Sign lost a favorite");
@@ -509,6 +602,9 @@ async function run() {
   check(effects.apply(state).mounted.length === 3, "Re-enable failed");
   effects.close();
   check(document.querySelectorAll("[data-packpier-plugin]").length === 0, "Plugin elements survived shutdown");
+  check(!document.querySelector("style[data-packpier-style]") && nativeSheet.isConnected,
+    "Shutdown must remove current plugin styles and keep native styles");
+  nativeSheet.remove();
   check(![...document.querySelectorAll("[style]")].some(el => el.style.getPropertyValue("--prism-native-color")),
     "Prism row colors survived shutdown");
   await checkTransparentWindow(effects, storageKey);

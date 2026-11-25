@@ -11,10 +11,22 @@ const effects = new Map([
   ["custom-background", { activate: background, css: backgroundStyle }],
 ]);
 
+// Inspect selectors so comments and CSS strings in Codex's own sheets are untouched.
+const legacySelector = /(?:\.packpier-p-sign(?![\w-])|\.prism-[\w-]+|\[data-(?:packpier-cbgp[\w-]*|packpier-settings-overlay|prism-[\w-]+)(?=[\s~|^$*=\]]))/;
+
+function usesLegacySelectors(rules) {
+  return Array.from(rules ?? []).some(rule =>
+    legacySelector.test(rule.selectorText ?? "") || usesLegacySelectors(rule.cssRules));
+}
+
 export function createWindowEffects({ prismService, backgroundService, settingsSections }) {
+  for (const style of document.querySelectorAll("style:not([data-packpier-style])")) {
+    if (usesLegacySelectors(style.sheet?.cssRules)) style.remove();
+  }
   const mounted = [];
   function mount(id) {
     const effect = effects.get(id);
+    for (const orphan of document.querySelectorAll('style[data-packpier-style="' + id + '"]')) orphan.remove();
     const root = document.createElement("div");
     root.dataset.packpierPlugin = id;
     document.body.append(root);
@@ -23,6 +35,7 @@ export function createWindowEffects({ prismService, backgroundService, settingsS
     try {
       if (effect.css) {
         const style = document.createElement("style");
+        style.dataset.packpierStyle = id;
         style.textContent = effect.css;
         document.head.append(style);
         onCleanup(() => style.remove());

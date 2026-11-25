@@ -1,6 +1,6 @@
 {
   "name": "p-sign",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "在 Codex 左下角显示 Packpier 标志和加载状态绿点，悬停可使用插件提供的快捷操作。",
   "type": "module",
   "dependencies": {},

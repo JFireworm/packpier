@@ -4,7 +4,7 @@ import { createWindowEffects } from "./index.js";
 
 import { backgroundTitle, registerBackgroundNavigation } from "./background-settings-nav.js";
 
-const VERSION = "packpier-window-5";
+const VERSION = "packpier-window-8";
 
 const pending = new Map();
 const listeners = new Map();
@@ -78,6 +78,7 @@ const settingsSections = (() => {
         <div data-packpier-settings-body></div>
       </section>`;
     const style = document.createElement("style");
+    style.dataset.packpierStyle = "custom-background";
     style.textContent = `
       [data-packpier-background-nav] { display:flex; align-items:center; gap:8px; width:100%; padding:6px 8px; border:0; border-radius:7px; color:inherit; background:transparent; text-align:start; font:inherit; font-size:14px; cursor:pointer; }
       [data-packpier-background-nav]:hover, [data-packpier-background-nav][aria-current] { background:color-mix(in srgb, currentColor 9%, transparent); }

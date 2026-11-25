@@ -58,4 +58,4 @@ with TemporaryDirectory(prefix="packpier-effects-") as folder:
                             capture_output=True, text=True, check=True, timeout=30)
     if "<body>PACKPIER_EFFECTS_PASS</body>" not in output.stdout:
         raise SystemExit(output.stdout[-1500:] or output.stderr[-1500:])
-    print("PASS row color, wallpaper, P-Sign hover, image request, settings, favorites, pause and resume")
+    print("PASS row colors, wallpaper, P-Sign hover and loading geometry, settings, favorites, pause and resume")
